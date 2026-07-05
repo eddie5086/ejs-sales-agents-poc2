@@ -20,11 +20,25 @@ session reading this) is to implement it, phase by phase.
 6. `MIGRATION.md` — the any-account installability contract the installer must
    honor from Phase 0 onward.
 
-**The predecessor.** `ejs-sales-agents-poc` (poc1) lives at
-`../ejs-sales-agents-poc` and on GitHub (`eddie5086/ejs-sales-agents-poc`).
-It is **working and deployed**: read its `CLAUDE.md` and `docs/WORKFLOW.md` for
-the product behavior poc2 must mirror. poc1 stays untouched — poc2 is a fresh
-scaffold that ports proven pieces selectively.
+**Reference projects (two, both consultable):**
+
+- **poc1** — `ejs-sales-agents-poc`, at `../ejs-sales-agents-poc` and on GitHub
+  (`eddie5086/ejs-sales-agents-poc`). **Working and deployed**: read its
+  `CLAUDE.md` and `docs/WORKFLOW.md` for the product behavior poc2 must mirror.
+  poc1 stays untouched — poc2 is a fresh scaffold that ports proven pieces
+  selectively (see `docs/PORTING-GUIDE.md`).
+- **BDRAWSRESEARCHTOOL** — a similar, earlier AgentCore harness implementation,
+  at `../BdrAwsAgentClaude03Ed` and on GitHub
+  (`eddie5086/BdrAwsAgentClaude03Ed`; the tool also mirrored as
+  `eddie5086/BDRAWSRESEARCHTOOL`). Two reasons to consult it: (1) it is the
+  ORIGIN of the HRIS 3-contacts logic poc1 ported (`workbench/skills/contacts.md`,
+  `workbench/lib/hris_contact_finder.py`, `workbench/lib/hris_committee_scorer.py`,
+  `workbench/config/company.yaml`, mirrored in `lambda_services/`) — useful for
+  provenance and for extending the recipe (role-targeted searches, cadence);
+  (2) it is a prior AgentCore harness build — compare its harness/deploy choices
+  when making poc2's AgentCore-native decisions. For CODE, always port from
+  poc1's copies (they carry fixes: per-line extraction, scorer hardening,
+  golden tests), not from here.
 
 ---
 

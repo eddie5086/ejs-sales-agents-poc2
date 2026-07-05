@@ -3,6 +3,19 @@
 poc1 = `../ejs-sales-agents-poc` (also `github.com/eddie5086/ejs-sales-agents-poc`,
 master). It is deployed and verified; treat its behavior as the spec.
 
+Second reference: **BDRAWSRESEARCHTOOL** (`../BdrAwsAgentClaude03Ed`,
+`github.com/eddie5086/BdrAwsAgentClaude03Ed`, tool mirror
+`github.com/eddie5086/BDRAWSRESEARCHTOOL`) — the earlier AgentCore harness this
+lineage started from, and the ORIGIN of the HRIS buying-committee logic
+(`workbench/skills/contacts.md` orchestration skill, `workbench/lib/
+hris_contact_finder.py` extraction, `workbench/lib/hris_committee_scorer.py`
+scorer, `workbench/config/company.yaml` committee templates; stdlib-only copies
+mirrored in `lambda_services/`). Consult it for the FULL search recipe (the
+role-targeted LinkedIn queries and multi-thread cadence poc1 deferred) and for
+prior-art AgentCore harness decisions. **Port code from poc1, not from here** —
+poc1's copies carry post-handoff fixes (per-line extraction regexes, scorer
+input-hardening from its commit 5401de1, the 16 locked golden tests).
+
 ## Port VERBATIM (proven code — do not "improve")
 
 | poc1 path | poc2 destination | Notes |
