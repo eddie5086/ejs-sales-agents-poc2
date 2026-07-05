@@ -151,11 +151,12 @@ def test_fan_out_checkpoints_per_item():
     result = Engine(cfg, state=store).run("b", "a", payload)
     assert result.outputs["verify"] == [
         {"echoed": "c1"}, {"echoed": "c2"}, {"echoed": "c3"}]
-    assert store.computed == ["verify#c1", "verify#c2", "verify#c3"]
+    # fan-out runs threaded; completion order may vary, results stay ordered
+    assert sorted(store.computed) == ["verify#c1", "verify#c2", "verify#c3"]
 
     # Replay: every item cached, none recomputed.
     Engine(cfg, state=store).run("b", "a", payload)
-    assert store.cached == ["verify#c1", "verify#c2", "verify#c3"]
+    assert sorted(store.cached) == ["verify#c1", "verify#c2", "verify#c3"]
 
 
 def test_barrier_satisfied_lets_flow_continue():

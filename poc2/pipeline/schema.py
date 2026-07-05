@@ -49,6 +49,9 @@ class StageConfig(BaseModel):
     fan_out: Optional[Literal["per_contact", "per_item"]] = None
     stages: Optional[list[str]] = None  # composite children (declared stage ids)
     artifacts: Optional[list[str]] = None
+    # False for terminal persist stages: their writes are idempotent by key
+    # (architecture invariant 4) and must run on every replay, not be skipped.
+    checkpoint: bool = True
 
     @model_validator(mode="after")
     def _lint_stage(self) -> "StageConfig":
@@ -149,11 +152,19 @@ class PipelineConfig(BaseModel):
 
     def validate_prompt_files(self, base_dir: Path) -> None:
         """Prompt paths are relative to the repo root; missing files are
-        startup errors (prompts are versioned with the config, never inlined)."""
-        missing = [
-            s.prompt for s in self.stages
-            if s.prompt and not (base_dir / s.prompt).is_file()
-        ]
+        startup errors (prompts are versioned with the config, never inlined).
+
+        Besides `prompt`, any params value that looks like a prompt path
+        (a string starting with 'prompts/', directly or one dict level deep,
+        e.g. the generate stage's per-artifact prompt map) is validated too.
+        """
+        refs = [s.prompt for s in self.stages if s.prompt]
+        for s in self.stages:
+            for value in s.params.values():
+                candidates = value.values() if isinstance(value, dict) else [value]
+                refs += [v for v in candidates
+                         if isinstance(v, str) and v.startswith("prompts/")]
+        missing = [r for r in refs if not (base_dir / r).is_file()]
         if missing:
             raise ConfigError(f"missing prompt files: {missing}")
 

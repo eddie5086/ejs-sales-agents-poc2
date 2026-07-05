@@ -1,9 +1,8 @@
 """Runtime configuration. Env vars override the defaults below.
 
-Phase 0 keeps this minimal: region + state table (what StateStore needs) and
-the artifact local dir the engine writes demo output under. Phase 1 extends it
-with model tiers and the artifact bucket when bedrock.py / storage.py port over
-(see docs/PORTING-GUIDE.md).
+Model IDs are Bedrock inference-profile IDs, verified invocable on the dev
+account (see docs/AWS-GOTCHAS.md §1). The deployed runtime gets everything as
+env vars from deploy.config; local dev reads repo-root config.json.
 """
 from __future__ import annotations
 
@@ -13,7 +12,12 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
-_HARDCODED = {"aws_region": "us-east-1"}
+_HARDCODED = {
+    "aws_region": "us-east-1",
+    "haiku": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "sonnet": "us.anthropic.claude-sonnet-4-6",
+    "opus": "us.anthropic.claude-opus-4-6-v1",
+}
 
 
 @lru_cache(maxsize=1)
@@ -27,6 +31,14 @@ def _json_cfg() -> dict:
         return {}
 
 
+def _default_region() -> str:
+    return _json_cfg().get("aws_region", _HARDCODED["aws_region"])
+
+
+def _default_model(tier: str) -> str:
+    return _json_cfg().get("models", {}).get(tier, _HARDCODED[tier])
+
+
 def _env(key: str, default: str) -> str:
     # Precedence: env var > config.json > hardcoded fallback.
     return os.environ.get(key, default)
@@ -34,18 +46,31 @@ def _env(key: str, default: str) -> str:
 
 @dataclass(frozen=True)
 class Settings:
-    aws_region: str = field(
-        default_factory=lambda: _env(
-            "AWS_REGION", _json_cfg().get("aws_region", _HARDCODED["aws_region"])
-        )
-    )
+    aws_region: str = field(default_factory=lambda: _env("AWS_REGION", _default_region()))
 
-    # Idempotency/state table (poc1 §9). Empty -> in-memory (single-process)
-    # fallback, so local runs need no DynamoDB. The AWS runtime sets this.
+    # Tiered models (poc1 §4.7 discipline, now also linted by the pipeline schema).
+    model_haiku: str = field(
+        default_factory=lambda: _env("BEDROCK_MODEL_HAIKU", _default_model("haiku")))
+    model_sonnet: str = field(
+        default_factory=lambda: _env("BEDROCK_MODEL_SONNET", _default_model("sonnet")))
+    model_opus: str = field(
+        default_factory=lambda: _env("BEDROCK_MODEL_OPUS", _default_model("opus")))
+
+    # Terminal artifact store. Empty bucket -> write to local dir instead.
+    artifact_s3_bucket: str = field(default_factory=lambda: _env("ARTIFACT_S3_BUCKET", ""))
+    artifact_local_dir: str = field(default_factory=lambda: _env("ARTIFACT_LOCAL_DIR", "out"))
+
+    # Idempotency/state table. Empty -> in-memory (single-process) fallback,
+    # so local runs need no DynamoDB. The AWS runtime sets this to a real table.
     state_ddb_table: str = field(default_factory=lambda: _env("STATE_DDB_TABLE", ""))
 
-    # Local artifact/output dir for engine runs without S3.
-    artifact_local_dir: str = field(default_factory=lambda: _env("ARTIFACT_LOCAL_DIR", "out"))
+    def model_for_tier(self, tier: str) -> str:
+        return {"haiku": self.model_haiku, "sonnet": self.model_sonnet, "opus": self.model_opus}[
+            tier
+        ]
 
 
 settings = Settings()
+
+# Deterministic vs. creative sampling by tier.
+TIER_TEMPERATURE = {"haiku": 0.0, "sonnet": 0.3, "opus": 0.7}

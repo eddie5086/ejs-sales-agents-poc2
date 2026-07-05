@@ -1,0 +1,95 @@
+# The full poc1-equivalent BDR outreach pipeline, product behavior driven
+# entirely by this file (docs/ARCHITECTURE.md). Business decisions encoded
+# here were user-approved in poc1 — see CLAUDE.md "Decisions locked".
+name: bdr_outreach
+stages:
+  - id: validate
+    kind: agent
+    tier: haiku
+    strategy: deterministic_fields   # required-field gate in code; Haiku = advisory reasons
+    prompt: prompts/validate.md
+    params: {required_fields: [name, domain, industry, size_band, hq_region]}
+
+  # --- identify composite: fetch_pages -> enrich -> prioritize -> persist ---
+  - id: fetch_pages
+    kind: tool
+    strategy: fetch_pages
+    params:
+      fetch: [attached, fixture]     # ordered fallback chain; Phase 3 inserts `browser`
+      fixture_dir: mocks/pages
+  - id: enrich
+    kind: agent
+    tier: sonnet
+    strategy: enrich_contacts        # anchor-quality judgment — the one model call in identification
+    prompt: prompts/enrich.md
+  - id: prioritize
+    kind: policy
+    strategy: hris_committee         # verbatim-ported prioritizer; deterministic P1-P3
+    params:
+      contacts_needed: 3
+      email_policy: high_confidence_only
+  - id: persist_identified
+    kind: tool
+    strategy: persist_identified
+    checkpoint: false                # idempotent-by-key write, runs every replay
+  - id: identify
+    kind: composite
+    stages: [fetch_pages, enrich, prioritize, persist_identified]
+
+  - id: verify
+    kind: agent
+    tier: haiku
+    strategy: email_or_phone         # VERIFIED iff valid email OR phone
+    prompt: prompts/verify.md
+    fan_out: per_contact
+    params: {items_from: contact_pool}   # CRM contacts + identified candidates
+
+  - id: reconcile
+    kind: policy
+    strategy: alphabetical           # swap to priority_first here, no code edit
+    params: {count: 3}
+
+  - id: research
+    kind: agent
+    tier: sonnet
+    strategy: account_research
+    prompt: prompts/research.md
+
+  - id: summary
+    kind: agent
+    tier: sonnet
+    strategy: five_bullets
+    prompt: prompts/summary.md
+    params: {bullets: 5}
+
+  - id: generate
+    kind: agent
+    tier: opus
+    generation: true                 # REQUIRED for opus — the tier lint
+    strategy: artifact_generators
+    fan_out: per_contact
+    artifacts: [email, linkedin, talk_track]   # 3 contacts x 3 = 9 Opus checkpoints
+    params:
+      items_from: selected_contacts
+      voice: static                  # memory (Phase 4) | static
+      voice_prompt: prompts/voice_static.md
+      product_prompt: prompts/product_context.md
+      prompts:
+        email: prompts/generate_email.md
+        linkedin: prompts/generate_linkedin.md
+        talk_track: prompts/generate_talk_track.md
+
+  - id: persist
+    kind: tool
+    strategy: artifact_writer
+    checkpoint: false                # idempotent-by-key writes, run every replay
+
+flow:
+  - {parallel: [validate, identify]}
+  - verify
+  - reconcile
+  - {barrier: {require: [account_valid, three_verified]}}
+  - research
+  - summary
+  - generate
+  - persist

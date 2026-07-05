@@ -1,0 +1,43 @@
+{
+  "account_id": "acct-001",
+  "bdr_id": "bdr-emea-07",
+  "name": "Meridian Robotics",
+  "domain": "meridianrobotics.com",
+  "industry": "Industrial Automation",
+  "size_band": "201-500",
+  "hq_region": "EMEA",
+  "contacts": [
+    {
+      "contact_id": "c-101",
+      "first_name": "Priya",
+      "last_name": "Nair",
+      "title": "VP People",
+      "email": "priya.nair@meridianrobotics.com",
+      "phone": "+441632960011"
+    },
+    {
+      "contact_id": "c-102",
+      "first_name": "Tomas",
+      "last_name": "Alvarez",
+      "title": "Head of Talent",
+      "email": "tomas.alvarez@meridianrobotics.com",
+      "phone": null
+    },
+    {
+      "contact_id": "c-103",
+      "first_name": "Sofia",
+      "last_name": "Berg",
+      "title": "HR Operations Manager",
+      "email": null,
+      "phone": "+4915112345678"
+    },
+    {
+      "contact_id": "c-104",
+      "first_name": "Dead",
+      "last_name": "Lead",
+      "title": null,
+      "email": "not-an-email",
+      "phone": "n/a"
+    }
+  ]
+}

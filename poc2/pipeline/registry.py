@@ -13,9 +13,12 @@ from typing import Any, Callable
 
 StrategyFn = Callable[["StageContext"], Any]  # noqa: F821 (defined in engine)
 ConditionFn = Callable[[dict], bool]
+# Fan-out items provider: (payload, outputs) -> list of dict-like items.
+ItemsFn = Callable[[dict, dict], list]
 
 _STRATEGIES: dict[tuple[str, str], StrategyFn] = {}
 _CONDITIONS: dict[str, ConditionFn] = {}
+_ITEMS: dict[str, ItemsFn] = {}
 
 
 class RegistryError(KeyError):
@@ -55,3 +58,22 @@ def resolve_condition(name: str) -> ConditionFn:
         return _CONDITIONS[name]
     except KeyError:
         raise RegistryError(f"no barrier condition registered: '{name}'")
+
+
+def register_items(name: str) -> Callable[[ItemsFn], ItemsFn]:
+    """Register a fan-out items provider, referenced from stage params as
+    `items_from: <name>` (e.g. verify fans over the whole contact pool while
+    generate fans over the reconciled selection)."""
+    def deco(fn: ItemsFn) -> ItemsFn:
+        if name in _ITEMS:
+            raise RegistryError(f"items provider already registered: {name}")
+        _ITEMS[name] = fn
+        return fn
+    return deco
+
+
+def resolve_items(name: str) -> ItemsFn:
+    try:
+        return _ITEMS[name]
+    except KeyError:
+        raise RegistryError(f"no fan-out items provider registered: '{name}'")

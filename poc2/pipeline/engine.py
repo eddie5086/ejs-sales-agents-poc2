@@ -33,11 +33,16 @@ class BarrierNotSatisfied(RuntimeError):
 @dataclass
 class StageContext:
     """What a strategy sees: its stage config, the run payload, prior outputs,
-    and — when fanned out — the single item this invocation covers."""
+    and — when fanned out — the single item (and artifact type) this
+    invocation covers."""
     stage: StageConfig
     payload: dict
     outputs: dict[str, Any]
     item: Optional[dict] = None
+    artifact: Optional[str] = None
+    batch_id: str = ""
+    account_id: str = ""
+    state: Optional[StateStore] = None
 
     @property
     def params(self) -> dict:
@@ -107,28 +112,57 @@ class Engine:
             return self._run_fan_out(stage, batch_id, account_id, payload, outputs)
 
         fn = registry.resolve(stage.kind, stage.strategy)
-        ctx = StageContext(stage=stage, payload=payload, outputs=outputs)
+        ctx = StageContext(stage=stage, payload=payload, outputs=outputs,
+                           batch_id=batch_id, account_id=account_id, state=self.state)
+        if not stage.checkpoint:
+            # Idempotent-by-key persist stages run on every replay.
+            return fn(ctx)
         return self.state.checkpoint(batch_id, account_id, stage.id, lambda: fn(ctx))
+
+    def _fan_items(self, stage: StageConfig, payload: dict, outputs: dict) -> list:
+        """Items to fan over: a registered provider named by params.items_from
+        (e.g. contact_pool, selected_contacts), else the payload key mapped
+        from the fan_out mode."""
+        items_from = stage.params.get("items_from")
+        if items_from:
+            return registry.resolve_items(items_from)(payload, outputs) or []
+        return payload.get(FAN_OUT_SOURCES[stage.fan_out]) or []
+
+    @staticmethod
+    def _item_id(item: Any, idx: int) -> str:
+        if isinstance(item, dict):
+            return str(item.get("id") or item.get("contact_id") or idx)
+        return str(idx)
 
     def _run_fan_out(
         self, stage: StageConfig, batch_id: str, account_id: str,
         payload: dict, outputs: dict[str, Any],
     ) -> list[Any]:
-        """Fan a stage over the payload items; each item checkpoints under
-        `{stage_id}#{item_id}` so replay resumes per item."""
+        """Fan a stage over its items (× artifact types when the stage declares
+        `artifacts`), threaded like poc1's verify/generate fan-outs. Each
+        invocation checkpoints under `{stage_id}#{item_id}` or
+        `{stage_id}#{item_id}#{artifact}` so replay resumes per item."""
         fn = registry.resolve(stage.kind, stage.strategy)
-        source_key = FAN_OUT_SOURCES[stage.fan_out]
-        items = payload.get(source_key) or []
-        results = []
+        items = self._fan_items(stage, payload, outputs)
+
+        jobs = []  # (checkpoint_key, ctx) in deterministic order
         for idx, item in enumerate(items):
-            item_id = item.get("id", str(idx)) if isinstance(item, dict) else str(idx)
-            ctx = StageContext(stage=stage, payload=payload, outputs=outputs, item=item)
-            results.append(
-                self.state.checkpoint(
-                    batch_id, account_id, f"{stage.id}#{item_id}", lambda c=ctx: fn(c)
-                )
-            )
-        return results
+            item_id = self._item_id(item, idx)
+            for artifact in (stage.artifacts or [None]):
+                key = f"{stage.id}#{item_id}" + (f"#{artifact}" if artifact else "")
+                jobs.append((key, StageContext(
+                    stage=stage, payload=payload, outputs=outputs, item=item,
+                    artifact=artifact, batch_id=batch_id, account_id=account_id,
+                    state=self.state)))
+        if not jobs:
+            return []
+
+        def run_one(job):
+            key, ctx = job
+            return self.state.checkpoint(batch_id, account_id, key, lambda: fn(ctx))
+
+        with ThreadPoolExecutor(max_workers=min(len(jobs), 9)) as pool:
+            return list(pool.map(run_one, jobs))
 
     # ---- barriers ------------------------------------------------------------
 
