@@ -1,0 +1,15 @@
+# Phase 0 demo pipeline: two policy stages, driven entirely by this file.
+# Proves config-interpreted execution + data flow between stages.
+name: demo
+stages:
+  - id: greet
+    kind: policy
+    strategy: template
+    params: {template: "Hello {company}, welcome to poc2"}
+  - id: shout
+    kind: policy
+    strategy: uppercase
+    params: {source: greet}
+flow:
+  - greet
+  - shout

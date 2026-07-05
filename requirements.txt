@@ -1,0 +1,11 @@
+# Pipeline config + domain models
+pydantic>=2.6
+PyYAML>=6.0
+
+# AWS SDK (deploy tooling; runtime backends activate in Phase 2)
+boto3>=1.34
+
+# Dev
+pytest>=8.0
+
+# Phase 1 adds: strands-agents (Bedrock agent harness)
