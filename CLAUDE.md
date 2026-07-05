@@ -47,7 +47,7 @@ session reading this) is to implement it, phase by phase.
 | Phase | State | Exit criterion |
 |---|---|---|
 | 0 — Scaffold + engine skeleton + migration tooling | ✅ done (2026-07-05) | 2-stage demo pipeline runs locally from config; `python -m deploy.config` prints resolved names — verified: 35 offline tests green, demo runs, resolved set correct on 296497502276, installer preflight passes |
-| 1 — Port the product behind the engine | ❌ | local run vs real Bedrock reproduces poc1 output (Meridian 68/B, Northwind 59/C) from config alone |
+| 1 — Port the product behind the engine | ✅ done (2026-07-05) | local run vs real Bedrock reproduces poc1 output (Meridian 68/B, Northwind 59/C) from config alone — verified: 65 offline tests green (16 golden locked), real-Bedrock batch run hit every parity target (68/B + high-conf IT-Director email + trinet; 59/C + P3 email withheld at moderate conf + rippling), 10 artifacts/account in the §11.2 layout |
 | 2 — Deploy the envelope (Runtime + DynamoDB + SFN) | ❌ | AWS batch run + sub-second idempotent replay |
 | 3 — Live web fetch via AgentCore Browser tool | ❌ | identify lane fetches via Browser for a real company; fixtures still work |
 | 4 — AgentCore Memory (BDR voice + account history) | ❌ | two BDRs get distinguishably different voice from config+memory only |
@@ -123,6 +123,30 @@ access blocks apply, see `docs/AWS-GOTCHAS.md` §1.
   MIGRATION §7); `install.py` runs it before touching AWS.
 - boto3/yaml imports in `poc2/state.py` and `deploy/config.py` are deferred
   into the code paths that need them, so offline runs/tests import zero AWS.
+
+## Phase 1 notes — smallest-call decisions where the docs were silent
+
+- **`checkpoint: false` stage flag** for the persist stages: artifact writes
+  are idempotent by key (architecture invariant 4) and must re-run on replay
+  (poc1 behavior), so they bypass the write-once wrapper.
+- **Fan-out item sets are named providers** (`register_items`), picked per
+  stage via `params.items_from` — `contact_pool` (CRM + identified) for
+  verify, `selected_contacts` for generate. Payload-key fallback (Phase 0
+  behavior) still works.
+- **`artifacts:` on a fan-out stage multiplies the fan** (items × artifact
+  types), checkpoint key `gen#<contact_id>#<artifact>`; one strategy
+  invocation handles one (contact, artifact) pair. Fan-outs run threaded
+  (≤9 workers), matching poc1's verify/generate pools.
+- **Prompt files**: optional instruction section after a lone `---` line
+  (generators use it: system above, task below). Any params string starting
+  with `prompts/` (directly or one dict level deep) is existence-checked at
+  config load.
+- **Barrier placement follows ARCHITECTURE.md**, not poc1's runner: an
+  invalid account halts at the post-reconcile barrier rather than before
+  verification (both mock accounts are VALID, so parity outcomes unaffected).
+- The static BDR voice + product context live in `prompts/voice_static.md` /
+  `prompts/product_context.md`, referenced from generate-stage params
+  (`voice: static`; `voice: memory` errors until Phase 4).
 
 ## Commands
 

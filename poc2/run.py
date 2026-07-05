@@ -1,30 +1,55 @@
 """Run a pipeline locally from its YAML config.
 
-    python -m poc2.run pipelines/demo.yaml [--batch-id B] [--account-id A]
-                                           [--payload '{"company": "Acme"}']
+    python -m poc2.run pipelines/demo.yaml
+    python -m poc2.run pipelines/bdr_outreach.yaml --account mocks/sample_account.json
+    python -m poc2.run pipelines/bdr_outreach.yaml --batch mocks/sample_batch.json
 
-Local-first: in-memory state store, no AWS resources touched. The AWS-backed
-implementations activate via config in later phases.
+Local-first: in-memory state store, artifacts under ./out. Agent stages make
+real Bedrock calls (credentials required); the demo pipeline is policy-only
+and needs no AWS. AWS-backed state/storage activate via env in Phase 2.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
-import poc2.pipeline.strategies  # noqa: F401 — populates the registry
+import poc2.pipeline.strategies  # noqa: F401 — demo built-ins
+import poc2.stages  # noqa: F401 — product strategies populate the registry
 from poc2.pipeline.engine import Engine
 from poc2.pipeline.schema import ConfigError, load_pipeline
+from poc2.state import StateStore
+
+
+def _summarize(result) -> None:
+    print(f"pipeline={result.pipeline} batch={result.batch_id} "
+          f"account={result.account_id}")
+    for stage_id, output in result.outputs.items():
+        text = json.dumps(output, default=lambda o: getattr(o, "model_dump", lambda: str(o))())
+        print(f"  {stage_id}: {text[:200]}{'…' if len(text) > 200 else ''}")
+    print(f"computed={len(result.computed)} cached={len(result.cached)}")
+
+
+def _run_account(config, account: dict, batch_id: str):
+    # Fresh store per account: manifest idempotency counts stay per-invocation
+    # (poc1 semantics — in AWS each account is its own runtime invocation).
+    payload = {"account": account, "_started_at": time.time()}
+    engine = Engine(config, state=StateStore())
+    result = engine.run(batch_id, account.get("account_id", "demo-account"), payload)
+    _summarize(result)
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("pipeline", help="path to a pipeline YAML")
+    parser.add_argument("--account", help="path to one account JSON")
+    parser.add_argument("--batch", help="path to a batch JSON ({batch_id, accounts})")
     parser.add_argument("--batch-id", default="local-batch")
-    parser.add_argument("--account-id", default="demo-account")
     parser.add_argument("--payload", default='{"company": "Acme"}',
-                        help="JSON run payload")
+                        help="JSON run payload (pipelines without --account/--batch)")
     args = parser.parse_args(argv)
 
     try:
@@ -33,14 +58,24 @@ def main(argv: list[str] | None = None) -> int:
         print(f"CONFIG ERROR: {e}", file=sys.stderr)
         return 1
 
-    engine = Engine(config)
-    result = engine.run(args.batch_id, args.account_id, json.loads(args.payload))
+    if args.batch:
+        batch = json.loads(Path(args.batch).read_text())
+        batch_id = batch.get("batch_id", args.batch_id)
+        for account in batch["accounts"]:
+            print(f"\n=== Account {account['account_id']} ({account.get('name')}) ===")
+            _run_account(config, account, batch_id)
+        return 0
 
-    print(f"pipeline={result.pipeline} batch={result.batch_id} "
-          f"account={result.account_id} state={engine.state.backend}")
-    for stage_id, output in result.outputs.items():
-        print(f"  {stage_id}: {json.dumps(output, default=str)}")
-    print(f"computed={result.computed} cached={result.cached}")
+    if args.account:
+        account = json.loads(Path(args.account).read_text())
+        print(f"\n=== Account {account['account_id']} ({account.get('name')}) ===")
+        _run_account(config, account, args.batch_id)
+        return 0
+
+    engine = Engine(config, state=StateStore())  # in-memory unless STATE_DDB_TABLE set
+    result = engine.run(args.batch_id, "demo-account", json.loads(args.payload))
+    print(f"state={engine.state.backend}")
+    _summarize(result)
     return 0
 
 
