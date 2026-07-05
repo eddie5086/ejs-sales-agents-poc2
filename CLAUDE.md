@@ -46,7 +46,7 @@ session reading this) is to implement it, phase by phase.
 
 | Phase | State | Exit criterion |
 |---|---|---|
-| 0 — Scaffold + engine skeleton + migration tooling | ❌ not started | 2-stage demo pipeline runs locally from config; `python -m deploy.config` prints resolved names |
+| 0 — Scaffold + engine skeleton + migration tooling | ✅ done (2026-07-05) | 2-stage demo pipeline runs locally from config; `python -m deploy.config` prints resolved names — verified: 35 offline tests green, demo runs, resolved set correct on 296497502276, installer preflight passes |
 | 1 — Port the product behind the engine | ❌ | local run vs real Bedrock reproduces poc1 output (Meridian 68/B, Northwind 59/C) from config alone |
 | 2 — Deploy the envelope (Runtime + DynamoDB + SFN) | ❌ | AWS batch run + sub-second idempotent replay |
 | 3 — Live web fetch via AgentCore Browser tool | ❌ | identify lane fetches via Browser for a real company; fixtures still work |
@@ -104,7 +104,27 @@ migratable via config: `resource_prefix: bdr-poc2`,
 `bdr-poc2-artifacts-{accountId}`). Model tiers: same IDs as poc1 — and the same
 access blocks apply, see `docs/AWS-GOTCHAS.md` §1.
 
-## Commands (will exist after Phase 0)
+## Phase 0 notes — smallest-call decisions where the docs were silent
+
+- **Composite children are top-level declared stages** referenced by id in the
+  composite's `stages:` list (they need not appear in `flow`). Children
+  checkpoint under their own ids; the composite itself is not re-checkpointed —
+  its output is the mapping of child outputs.
+- **Fannable kinds are `agent` and `tool`**; `fan_out` on `policy`/`composite`
+  is a config error. Fan-out items come from the run payload
+  (`per_contact` → `payload["contacts"]`), item checkpoint key
+  `{stage_id}#{item_id}`.
+- **Agent stages require a `tier`** (config error otherwise).
+- **Barrier `require` names resolve in a condition registry**
+  (`register_condition(name)` — predicates over accumulated stage outputs);
+  an unsatisfied barrier raises and halts the account's pipeline.
+- **`deploy/config.py` grew a static `validate()`** (prefix lowercase,
+  agent_name underscores, region-family ↔ model-ID-prefix coupling per
+  MIGRATION §7); `install.py` runs it before touching AWS.
+- boto3/yaml imports in `poc2/state.py` and `deploy/config.py` are deferred
+  into the code paths that need them, so offline runs/tests import zero AWS.
+
+## Commands
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
