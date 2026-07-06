@@ -9,7 +9,8 @@
       "ToleratedFailurePercentage": 50,
       "ItemSelector": {
         "account.$": "$$.Map.Item.Value",
-        "batch_id.$": "$.batch_id"
+        "batch_id.$": "$.batch_id",
+        "param_overrides.$": "$.param_overrides"
       },
       "ItemProcessor": {
         "ProcessorConfig": { "Mode": "INLINE" },

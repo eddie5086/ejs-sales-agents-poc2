@@ -27,10 +27,15 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("account", nargs="?", default="mocks/sample_account.json")
     p.add_argument("--batch", default="batch-agentcore-001")
+    p.add_argument("--pipeline", default=None,
+                   help="pipeline YAML inside the image (default: bdr_outreach)")
     args = p.parse_args()
 
     account = json.loads(Path(args.account).read_text())
-    payload = json.dumps({"account": account, "batch_id": args.batch})
+    body_payload = {"account": account, "batch_id": args.batch}
+    if args.pipeline:
+        body_payload["pipeline"] = args.pipeline
+    payload = json.dumps(body_payload)
 
     client = boto3.client("bedrock-agentcore", region_name=REGION)
     print(f"Invoking {RUNTIME_ARN.split('/')[-1]} ...")

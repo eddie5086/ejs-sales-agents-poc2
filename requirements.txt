@@ -11,3 +11,7 @@ strands-agents>=0.1.0
 
 # Dev
 pytest>=8.0
+
+# AgentCore Browser automation (identify-lane live fetch)
+bedrock-agentcore
+playwright>=1.45

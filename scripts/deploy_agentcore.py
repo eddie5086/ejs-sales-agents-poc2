@@ -72,12 +72,24 @@ def grant_execution_role() -> None:
                         "dynamodb:UpdateItem", "dynamodb:BatchGetItem"],
              "Resource": [table_arn, table_arn + "/index/*"]},
         ],
+        # Phase 3: the identify lane's fetch chain opens AgentCore Browser
+        # sessions (aws.browser.v1). Session ARNs are dynamic -> resource *.
+        "BdrBrowserTool": [
+            {"Effect": "Allow",
+             "Action": ["bedrock-agentcore:StartBrowserSession",
+                        "bedrock-agentcore:GetBrowserSession",
+                        "bedrock-agentcore:StopBrowserSession",
+                        "bedrock-agentcore:ListBrowserSessions",
+                        "bedrock-agentcore:ConnectBrowserAutomationStream",
+                        "bedrock-agentcore:UpdateBrowserStream"],
+             "Resource": "*"},
+        ],
     }
     for name, statements in policies.items():
         iam.put_role_policy(RoleName=role, PolicyName=name,
                             PolicyDocument=json.dumps({"Version": "2012-10-17",
                                                        "Statement": statements}))
-    print(f"  granted {role}: S3 + ECR + DynamoDB")
+    print(f"  granted {role}: S3 + ECR + DynamoDB + Browser")
 
 
 def main() -> int:

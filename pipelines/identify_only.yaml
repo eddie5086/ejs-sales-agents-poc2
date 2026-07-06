@@ -1,0 +1,38 @@
+# Identify lane only — the Phase 3 exit-criterion pipeline: fetch pages via
+# the AgentCore Browser tool for a REAL company (no fixture exists), judge
+# enrichment, run the verbatim prioritizer, persist. Same stages as
+# bdr_outreach.yaml; a different flow is just different config.
+name: identify_only
+stages:
+  - id: validate
+    kind: agent
+    tier: haiku
+    strategy: deterministic_fields
+    prompt: prompts/validate.md
+    params: {required_fields: [name, domain, industry, size_band, hq_region]}
+  - id: fetch_pages
+    kind: tool
+    strategy: fetch_pages
+    params:
+      fetch: [attached, browser, fixture]
+      fixture_dir: mocks/pages
+  - id: enrich
+    kind: agent
+    tier: sonnet
+    strategy: enrich_contacts
+    prompt: prompts/enrich.md
+  - id: prioritize
+    kind: policy
+    strategy: hris_committee
+    params:
+      contacts_needed: 3
+      email_policy: high_confidence_only
+  - id: persist_identified
+    kind: tool
+    strategy: persist_identified
+    checkpoint: false
+  - id: identify
+    kind: composite
+    stages: [fetch_pages, enrich, prioritize, persist_identified]
+flow:
+  - {parallel: [validate, identify]}

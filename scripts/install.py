@@ -45,6 +45,18 @@ def run(script: str) -> None:
     subprocess.run([sys.executable, str(ROOT / "scripts" / script)], check=True, cwd=ROOT)
 
 
+def preflight_browser_tool() -> bool:
+    """Region availability of the AgentCore Browser tool (MIGRATION.md §5)."""
+    control = boto3.client("bedrock-agentcore-control", region_name=C.region())
+    try:
+        control.get_browser(browserId="aws.browser.v1")
+        print("  OK    AgentCore Browser tool (aws.browser.v1) available")
+        return True
+    except Exception as e:
+        print(f"  FAIL  AgentCore Browser tool not available in {C.region()}: {e}")
+        return False
+
+
 def main() -> int:
     print("=== preflight: config.json lint ===")
     problems = C.validate()
@@ -63,6 +75,12 @@ def main() -> int:
         print("\nOne or more models are not invocable on this account/region. Fix model "
               "access/agreements (see MIGRATION.md and docs/AWS-GOTCHAS.md §1) or edit "
               "config.json models, then re-run. Aborting before creating resources.")
+        return 1
+
+    print("\n=== preflight: AgentCore service availability ===")
+    if not preflight_browser_tool():
+        print("\nThe Browser tool backs the identify lane's live fetch (Phase 3). "
+              "Pick a region where AgentCore Browser is available. Aborting.")
         return 1
 
     run("deploy_agentcore.py")      # S3 bucket + runtime + role policies

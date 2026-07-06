@@ -16,6 +16,8 @@ def test_batch_envelope_asl_shape():
     task = fan["ItemProcessor"]["States"]["RunAccount"]
     assert task["Parameters"]["FunctionName"] == "${InvokeAccountFunctionArn}"
     assert task["Retry"][0]["MaxAttempts"] == 2
+    # invoke-time param overrides thread through the Map ItemSelector
+    assert fan["ItemSelector"]["param_overrides.$"] == "$.param_overrides"
 
 
 def test_lambda_handler_source_uses_runtime_arn_env():

@@ -46,7 +46,13 @@ class StageContext:
 
     @property
     def params(self) -> dict:
-        return self.stage.params
+        """Stage params, with invoke-time overrides merged on top. The payload
+        may carry `param_overrides: {stage_id: {key: value}}` — e.g. a parity
+        demo pinning the fetch chain to `[attached, fixture]` for fictional
+        mock domains without a second pipeline YAML. Stored checkpoints still
+        win on replay, so overrides never rewrite history."""
+        override = (self.payload.get("param_overrides") or {}).get(self.stage.id) or {}
+        return {**self.stage.params, **override} if override else self.stage.params
 
 
 @dataclass
@@ -123,7 +129,8 @@ class Engine:
         """Items to fan over: a registered provider named by params.items_from
         (e.g. contact_pool, selected_contacts), else the payload key mapped
         from the fan_out mode."""
-        items_from = stage.params.get("items_from")
+        items_from = ((payload.get("param_overrides") or {}).get(stage.id) or {}).get(
+            "items_from", stage.params.get("items_from"))
         if items_from:
             return registry.resolve_items(items_from)(payload, outputs) or []
         return payload.get(FAN_OUT_SOURCES[stage.fan_out]) or []

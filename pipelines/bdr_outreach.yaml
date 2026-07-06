@@ -15,7 +15,7 @@ stages:
     kind: tool
     strategy: fetch_pages
     params:
-      fetch: [attached, fixture]     # ordered fallback chain; Phase 3 inserts `browser`
+      fetch: [attached, browser, fixture]   # ordered fallback chain (browser = AgentCore Browser tool)
       fixture_dir: mocks/pages
   - id: enrich
     kind: agent
