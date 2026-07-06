@@ -1,0 +1,69 @@
+{
+  "batch_id": "batch-mixed-demo",
+  "accounts": [
+    {
+      "account_id": "acct-101",
+      "bdr_id": "bdr-emea-07",
+      "name": "Harborline Marine",
+      "domain": "harborlinemarine.com",
+      "industry": "Marine Logistics",
+      "size_band": "201-500",
+      "hq_region": "EMEA",
+      "contacts": [
+        {
+          "contact_id": "c-301",
+          "first_name": "Ingrid",
+          "last_name": "Bergstrom",
+          "title": "VP People",
+          "email": "ingrid.bergstrom@harborlinemarine.com",
+          "phone": "+46701234567"
+        },
+        {
+          "contact_id": "c-302",
+          "first_name": "Tomasz",
+          "last_name": "Kowal",
+          "title": "Head of Talent",
+          "email": "tomasz.kowal@harborlinemarine.com",
+          "phone": null
+        },
+        {
+          "contact_id": "c-303",
+          "first_name": "Aoife",
+          "last_name": "Byrne",
+          "title": "HR Operations Manager",
+          "email": null,
+          "phone": "+353861234567"
+        }
+      ]
+    },
+    {
+      "account_id": "acct-102",
+      "bdr_id": "bdr-na-04",
+      "name": "Copperfield Foods",
+      "domain": "copperfieldfoods.com",
+      "industry": "Food & Beverage",
+      "size_band": "51-200",
+      "hq_region": "NA",
+      "contacts": [
+        {
+          "contact_id": "c-401",
+          "first_name": "Maria",
+          "last_name": "Delgado",
+          "title": "HR Director",
+          "email": "maria.delgado@copperfieldfoods.com",
+          "phone": "+14155550123"
+        }
+      ]
+    },
+    {
+      "account_id": "acct-103",
+      "bdr_id": "bdr-emea-07",
+      "name": "Atlas Terrain Robotics",
+      "domain": "atlasterrain.com",
+      "industry": "Robotics",
+      "size_band": "201-500",
+      "hq_region": "EMEA",
+      "contacts": []
+    }
+  ]
+}

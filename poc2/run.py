@@ -35,10 +35,11 @@ def _summarize(result) -> None:
     print(observability.format_cost_table(observability.cost_table(result.trace)))
 
 
-def _run_account(config, account: dict, batch_id: str):
+def _run_account(config, account: dict, batch_id: str, overrides: dict | None = None):
     # Fresh store per account: manifest idempotency counts stay per-invocation
     # (poc1 semantics — in AWS each account is its own runtime invocation).
-    payload = {"account": account, "_started_at": time.time()}
+    payload = {"account": account, "_started_at": time.time(),
+               "param_overrides": overrides or {}}
     engine = Engine(config, state=StateStore())
     result = engine.run(batch_id, account.get("account_id", "demo-account"), payload)
     _summarize(result)
@@ -53,7 +54,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--batch-id", default="local-batch")
     parser.add_argument("--payload", default='{"company": "Acme"}',
                         help="JSON run payload (pipelines without --account/--batch)")
+    parser.add_argument("--fixture-only", action="store_true",
+                        help="pin the fetch chain to [attached, fixture] — "
+                             "deterministic runs for fictional mock domains")
     args = parser.parse_args(argv)
+    overrides = ({"fetch_pages": {"fetch": ["attached", "fixture"]}}
+                 if args.fixture_only else {})
 
     try:
         config = load_pipeline(args.pipeline, base_dir=Path.cwd())
@@ -66,13 +72,13 @@ def main(argv: list[str] | None = None) -> int:
         batch_id = batch.get("batch_id", args.batch_id)
         for account in batch["accounts"]:
             print(f"\n=== Account {account['account_id']} ({account.get('name')}) ===")
-            _run_account(config, account, batch_id)
+            _run_account(config, account, batch_id, overrides)
         return 0
 
     if args.account:
         account = json.loads(Path(args.account).read_text())
         print(f"\n=== Account {account['account_id']} ({account.get('name')}) ===")
-        _run_account(config, account, args.batch_id)
+        _run_account(config, account, args.batch_id, overrides)
         return 0
 
     engine = Engine(config, state=StateStore())  # in-memory unless STATE_DDB_TABLE set
