@@ -24,12 +24,15 @@ from poc2.state import StateStore
 
 
 def _summarize(result) -> None:
+    from poc2 import observability
+
     print(f"pipeline={result.pipeline} batch={result.batch_id} "
           f"account={result.account_id}")
     for stage_id, output in result.outputs.items():
         text = json.dumps(output, default=lambda o: getattr(o, "model_dump", lambda: str(o))())
         print(f"  {stage_id}: {text[:200]}{'…' if len(text) > 200 else ''}")
     print(f"computed={len(result.computed)} cached={len(result.cached)}")
+    print(observability.format_cost_table(observability.cost_table(result.trace)))
 
 
 def _run_account(config, account: dict, batch_id: str):

@@ -97,12 +97,21 @@ def grant_execution_role() -> None:
                         "bedrock-agentcore:RetrieveMemoryRecords"],
              "Resource": "*"},
         ],
+        # Phase 5: gateway discovery + SigV4-authorized MCP calls (AWS_IAM
+        # authorizer; gateway ids carry random suffixes -> resource *).
+        "BdrGateway": [
+            {"Effect": "Allow",
+             "Action": ["bedrock-agentcore:ListGateways",
+                        "bedrock-agentcore:GetGateway",
+                        "bedrock-agentcore:InvokeGateway"],
+             "Resource": "*"},
+        ],
     }
     for name, statements in policies.items():
         iam.put_role_policy(RoleName=role, PolicyName=name,
                             PolicyDocument=json.dumps({"Version": "2012-10-17",
                                                        "Statement": statements}))
-    print(f"  granted {role}: S3 + ECR + DynamoDB + Browser + Memory")
+    print(f"  granted {role}: S3 + ECR + DynamoDB + Browser + Memory + Gateway")
 
 
 def main() -> int:

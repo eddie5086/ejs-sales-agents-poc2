@@ -69,6 +69,10 @@ class Settings:
     # The AWS runtime sets this via deploy.config.runtime_env.
     memory_name: str = field(default_factory=lambda: _env("MEMORY_NAME", ""))
 
+    # AgentCore Gateway name (Phase 5). Empty -> gateway tool stages raise a
+    # clear error (an enrichment tool cannot silently no-op).
+    gateway_name: str = field(default_factory=lambda: _env("GATEWAY_NAME", ""))
+
     def model_for_tier(self, tier: str) -> str:
         return {"haiku": self.model_haiku, "sonnet": self.model_sonnet, "opus": self.model_opus}[
             tier

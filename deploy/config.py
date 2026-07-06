@@ -126,6 +126,24 @@ def memory_name() -> str:
     return f"{prefix().replace('-', '_')}_memory"
 
 
+def gateway_name() -> str:
+    """AgentCore Gateway (Phase 5). Gateway ID/URL auto-discovered by name."""
+    return f"{prefix()}-gateway"
+
+
+def gateway_role() -> str:
+    return f"{gateway_name()}-role"
+
+
+def crm_lambda_name() -> str:
+    """Mock CRM-lookup Lambda exposed through the Gateway as an MCP tool."""
+    return f"{prefix()}-crm-lookup"
+
+
+def crm_lambda_role() -> str:
+    return f"{crm_lambda_name()}-role"
+
+
 def runtime_env() -> dict:
     """Environment injected into the AgentCore runtime at deploy time."""
     m = models()
@@ -136,7 +154,8 @@ def runtime_env() -> dict:
         "BEDROCK_MODEL_HAIKU": m["haiku"],
         "BEDROCK_MODEL_SONNET": m["sonnet"],
         "BEDROCK_MODEL_OPUS": m["opus"],
-        "MEMORY_NAME": memory_name(),  # empty MEMORY_NAME = memory disabled
+        "MEMORY_NAME": memory_name(),      # empty = memory disabled
+        "GATEWAY_NAME": gateway_name(),    # empty = gateway tools disabled
     }
 
 
@@ -193,6 +212,10 @@ def resolved() -> dict:
         "state_machine": sfn_name(),
         "state_machine_role": sfn_role(),
         "memory_name": memory_name(),
+        "gateway_name": gateway_name(),
+        "gateway_role": gateway_role(),
+        "crm_lambda_name": crm_lambda_name(),
+        "crm_lambda_role": crm_lambda_role(),
         "models": models(),
     }
 

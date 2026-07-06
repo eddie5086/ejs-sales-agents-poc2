@@ -121,6 +121,42 @@ def delete_agent_runtime() -> None:
             raise
 
 
+def delete_gateway() -> None:
+    control = boto3.client("bedrock-agentcore-control", region_name=C.region())
+    try:
+        gws = [g for g in control.list_gateways().get("items", [])
+               if g.get("name") == C.gateway_name()]
+    except Exception as e:
+        print(f"  --    could not list gateways ({e}); skipping")
+        return
+    if not gws:
+        _gone("agentcore gateway", C.gateway_name())
+    else:
+        gid = gws[0]["gatewayId"]
+        for tgt in control.list_gateway_targets(gatewayIdentifier=gid).get("items", []):
+            control.delete_gateway_target(gatewayIdentifier=gid, targetId=tgt["targetId"])
+        control.delete_gateway(gatewayIdentifier=gid)
+        _deleted("agentcore gateway", C.gateway_name())
+
+
+def delete_crm_lambda() -> None:
+    lam = boto3.client("lambda", region_name=C.region())
+    try:
+        lam.delete_function(FunctionName=C.crm_lambda_name())
+        _deleted("lambda", C.crm_lambda_name())
+    except lam.exceptions.ResourceNotFoundException:
+        _gone("lambda", C.crm_lambda_name())
+    iam = boto3.client("iam", region_name=C.region())
+    for role in (C.crm_lambda_role(), C.gateway_role()):
+        try:
+            for pol in iam.list_role_policies(RoleName=role)["PolicyNames"]:
+                iam.delete_role_policy(RoleName=role, PolicyName=pol)
+            iam.delete_role(RoleName=role)
+            _deleted("iam role", role)
+        except iam.exceptions.NoSuchEntityException:
+            _gone("iam role", role)
+
+
 def delete_memory_store() -> None:
     client = boto3.client("bedrock-agentcore-control", region_name=C.region())
     name = C.memory_name()
@@ -153,7 +189,7 @@ def main() -> int:
     r = C.resolved()
     for key in ("state_machine", "lambda_name", "dynamodb_table", "artifact_bucket",
                 "ecr_repo", "lambda_role", "state_machine_role", "agent_name",
-                "memory_name"):
+                "memory_name", "gateway_name", "crm_lambda_name"):
         print(f"  {key}: {r[key]}")
 
     if not args.yes:
@@ -169,6 +205,8 @@ def main() -> int:
     delete_roles()
     delete_agent_runtime()
     delete_memory_store()
+    delete_gateway()
+    delete_crm_lambda()
     print("\nDONE — teardown complete.")
     return 0
 
