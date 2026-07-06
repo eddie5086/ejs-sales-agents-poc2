@@ -1,0 +1,468 @@
+<title>ejs-sales-agents-poc2 — Project Overview</title>
+<style>
+  :root {
+    --bg: #F7F7F4;
+    --surface: #FFFFFF;
+    --surface2: #EFEFEA;
+    --ink: #1F2428;
+    --muted: #6B7378;
+    --line: #DDDDD6;
+    --accent: #0E7C74;
+    --accent-ink: #0A5F59;
+    --haiku: #5B8DBE;
+    --sonnet: #8A6FBF;
+    --opus: #C2703D;
+    --good: #2E7D4F;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --serif: Charter, "Bitstream Charter", Georgia, Cambria, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14181B; --surface: #1C2226; --surface2: #232A2F;
+      --ink: #E8EAE6; --muted: #98A0A3; --line: #333B41;
+      --accent: #3FB8AD; --accent-ink: #6FCFC6;
+      --haiku: #7FA9D4; --sonnet: #A78FD6; --opus: #D68F5F; --good: #5CB884;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #F7F7F4; --surface: #FFFFFF; --surface2: #EFEFEA;
+    --ink: #1F2428; --muted: #6B7378; --line: #DDDDD6;
+    --accent: #0E7C74; --accent-ink: #0A5F59;
+    --haiku: #5B8DBE; --sonnet: #8A6FBF; --opus: #C2703D; --good: #2E7D4F;
+  }
+  :root[data-theme="dark"] {
+    --bg: #14181B; --surface: #1C2226; --surface2: #232A2F;
+    --ink: #E8EAE6; --muted: #98A0A3; --line: #333B41;
+    --accent: #3FB8AD; --accent-ink: #6FCFC6;
+    --haiku: #7FA9D4; --sonnet: #A78FD6; --opus: #D68F5F; --good: #5CB884;
+  }
+
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--serif); font-size: 17px; line-height: 1.65;
+    margin: 0; padding: 0 20px;
+  }
+  main { max-width: 880px; margin: 0 auto; padding: 48px 0 96px; }
+  h1, h2, h3 { font-family: var(--sans); text-wrap: balance; line-height: 1.2; }
+  h1 { font-size: 34px; font-weight: 650; letter-spacing: -0.02em; margin: 8px 0 10px; }
+  h2 { font-size: 23px; font-weight: 650; letter-spacing: -0.01em; margin: 0 0 14px; }
+  h3 { font-size: 16px; font-weight: 650; margin: 0 0 6px; }
+  p { max-width: 68ch; margin: 0 0 14px; }
+  section { margin-top: 64px; }
+  a { color: var(--accent-ink); }
+  code, .mono { font-family: var(--mono); font-size: 0.86em; }
+  code { background: var(--surface2); padding: 1px 5px; border-radius: 3px; }
+
+  .eyebrow {
+    font-family: var(--sans); font-size: 12px; font-weight: 650;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-ink);
+    margin: 0 0 8px;
+  }
+  .lede { font-size: 19px; max-width: 62ch; color: var(--ink); }
+  .muted { color: var(--muted); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
+  .chip {
+    font-family: var(--sans); font-size: 13px; font-weight: 600;
+    border: 1px solid var(--line); background: var(--surface);
+    border-radius: 999px; padding: 4px 12px;
+  }
+  .chip b { color: var(--accent-ink); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 6px; padding: 18px 20px;
+  }
+  .card p { font-size: 15.5px; margin-bottom: 0; }
+  .card h3 .mono { font-size: 13px; color: var(--muted); font-weight: 500; }
+
+  /* architecture diagram */
+  .arch { border: 1px solid var(--line); border-radius: 6px; background: var(--surface); padding: 20px; overflow-x: auto; }
+  .arch-box {
+    border: 1px solid var(--line); border-radius: 5px; background: var(--bg);
+    padding: 10px 14px; margin: 10px 0 0; min-width: 540px;
+  }
+  .arch-box:first-child { margin-top: 0; }
+  .arch-box .name { font-family: var(--mono); font-size: 13.5px; font-weight: 600; }
+  .arch-box .role { font-family: var(--sans); font-size: 13px; color: var(--muted); }
+  .arch-runtime { border-color: var(--accent); border-width: 1.5px; }
+  .arch-kids { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; min-width: 520px; }
+  .arch-kid { border: 1px dashed var(--line); border-radius: 5px; padding: 8px 12px; background: var(--surface); }
+  .arch-kid .name { font-family: var(--mono); font-size: 12.5px; font-weight: 600; }
+  .arch-kid .role { font-family: var(--sans); font-size: 12px; color: var(--muted); }
+  .arch-arrow { text-align: left; color: var(--muted); font-family: var(--mono); font-size: 13px; padding: 2px 0 0 24px; }
+
+  /* lifecycle rail */
+  .rail { list-style: none; margin: 24px 0 0; padding: 0; position: relative; }
+  .rail::before {
+    content: ""; position: absolute; left: 9px; top: 8px; bottom: 8px;
+    width: 2px; background: var(--line);
+  }
+  .rail li { position: relative; padding: 0 0 26px 40px; }
+  .rail li:last-child { padding-bottom: 0; }
+  .ckpt {
+    position: absolute; left: 0; top: 4px; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--surface); border: 2.5px solid var(--accent);
+    box-sizing: border-box;
+  }
+  .ckpt.open { border-style: dashed; border-color: var(--muted); }
+  .stage-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+  .stage-name { font-family: var(--mono); font-size: 15px; font-weight: 650; }
+  .stage-meta { font-family: var(--sans); font-size: 13px; color: var(--muted); }
+  .rail p { font-size: 15.5px; margin: 4px 0 0; max-width: 66ch; }
+  .tier {
+    font-family: var(--sans); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; border-radius: 3px;
+    padding: 1.5px 7px; color: #fff;
+  }
+  .tier.haiku { background: var(--haiku); }
+  .tier.sonnet { background: var(--sonnet); }
+  .tier.opus { background: var(--opus); }
+  .tier.none { background: var(--muted); }
+
+  /* tables */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; padding: 9px 14px; border-top: 1px solid var(--line); }
+  thead th {
+    border-top: none; font-family: var(--sans); font-size: 12px; font-weight: 650;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+  }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 13.5px; }
+  tr.total td { font-weight: 700; background: var(--surface2); }
+  .bar { display: inline-block; height: 9px; border-radius: 2px; background: var(--accent); vertical-align: baseline; }
+  .bar.opus { background: var(--opus); }
+  .bar.sonnet { background: var(--sonnet); }
+  .bar.haiku { background: var(--haiku); }
+
+  /* replay compare */
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
+  @media (max-width: 700px) { .compare { grid-template-columns: 1fr; } }
+  .compare .card .big { font-family: var(--sans); font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+  .compare .card .big small { font-size: 15px; font-weight: 500; color: var(--muted); }
+  .compare .replay { border-color: var(--accent); }
+  .kv { font-size: 14.5px; margin: 8px 0 0; }
+  .kv div { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; border-top: 1px dotted var(--line); }
+  .kv span:last-child { font-family: var(--mono); font-size: 13px; }
+
+  /* voice sample */
+  .voice pre {
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.55;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 5px;
+    padding: 12px 14px; margin: 10px 0 0; white-space: pre-wrap; overflow-x: auto;
+  }
+  pre.code {
+    font-family: var(--mono); font-size: 13px; line-height: 1.6;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+    padding: 16px 18px; overflow-x: auto; margin: 14px 0 0;
+  }
+  .ok { color: var(--good); font-weight: 700; }
+  ul.plain { padding-left: 20px; margin: 0; }
+  ul.plain li { margin-bottom: 8px; font-size: 15.5px; max-width: 66ch; }
+  .footer { margin-top: 72px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); font-family: var(--sans); }
+</style>
+
+<main>
+  <header>
+    <p class="eyebrow">ejs-sales-agents-poc2 · project overview</p>
+    <h1>A config-driven outreach factory on AWS AgentCore</h1>
+    <p class="lede">One versioned YAML file describes how a sales account becomes ten
+    ready-to-review outreach artifacts. An engine interprets that file inside Bedrock
+    AgentCore — fetching the live web, scoring the buying committee deterministically,
+    and writing every step down once so a re-run costs nothing.</p>
+    <div class="chips">
+      <span class="chip">6 phases · <b>all shipped</b></span>
+      <span class="chip"><b>92</b> offline tests</span>
+      <span class="chip">deployed on <b>296497502276</b> / us-east-1</span>
+      <span class="chip">replay <b>0.8s</b> / account</span>
+      <span class="chip">~<b>$0.32</b> / account cold</span>
+    </div>
+  </header>
+
+  <section>
+    <p class="eyebrow">What it does</p>
+    <h2>The user summary</h2>
+    <p>A BDR team hands the system a batch of target accounts. For each one it:
+    finds the right <em>three people</em> to contact (the HRIS buying committee —
+    champion, economic buyer, technical evaluator), verifies they're reachable,
+    researches the company, and drafts a personal <strong>email, LinkedIn note, and
+    call script for each contact</strong> — nine artifacts plus an account brief,
+    queued for human review. Nothing is ever sent automatically.</p>
+    <p>Two things make this build different from its predecessor (poc1):</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Behavior lives in config, not code</h3>
+        <p>Every stage — its model tier, prompt file, policy, and order — is declared in
+        <code>pipelines/bdr_outreach.yaml</code>. Swapping the contact-selection rule or
+        pinning the web-fetch source is a YAML edit. A validator refuses bad configs at
+        startup, including a lint that keeps the expensive Opus tier out of
+        non-generation stages.</p>
+      </div>
+      <div class="card">
+        <h3>AgentCore-native, end to end</h3>
+        <p>Runtime hosts the engine; the <strong>Browser tool</strong> fetches the live web
+        (no third-party search API); <strong>Memory</strong> gives each BDR their own writing
+        voice; <strong>Gateway</strong> exposes internal tools over MCP; Observability prices
+        every stage of every run.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Architecture</p>
+    <h2>The deployed system</h2>
+    <div class="arch">
+      <div class="arch-box">
+        <span class="name">Step Functions · bdr-poc2-batch-envelope</span>
+        <span class="role"> — fans a batch out per account, 3 at a time, tolerates 50% failures</span>
+      </div>
+      <div class="arch-arrow">└─ invokes per account</div>
+      <div class="arch-box">
+        <span class="name">Lambda · bdr-poc2-invoke-account</span>
+        <span class="role"> — the SFN→AgentCore proxy (no native integration exists)</span>
+      </div>
+      <div class="arch-arrow">└─ invoke_agent_runtime</div>
+      <div class="arch-box arch-runtime">
+        <span class="name">AgentCore Runtime · bdr_poc2_account_runner</span>
+        <span class="role"> — the pipeline engine: loads the YAML, lints it, executes the flow</span>
+        <div class="arch-kids">
+          <div class="arch-kid"><span class="name">Browser · aws.browser.v1</span><br>
+            <span class="role">live team pages + role-targeted LinkedIn searches</span></div>
+          <div class="arch-kid"><span class="name">Memory · bdr_poc2_memory</span><br>
+            <span class="role">per-BDR voice exemplars + account event history</span></div>
+          <div class="arch-kid"><span class="name">Gateway · bdr-poc2-gateway</span><br>
+            <span class="role">internal tools as MCP (mock CRM lookup), IAM-signed</span></div>
+          <div class="arch-kid"><span class="name">Bedrock models</span><br>
+            <span class="role">haiku / sonnet / opus tiers, adaptive retries</span></div>
+          <div class="arch-kid"><span class="name">DynamoDB · bdr-poc2-state</span><br>
+            <span class="role">write-once checkpoint per stage — the replay ledger</span></div>
+          <div class="arch-kid"><span class="name">S3 · bdr-poc2-artifacts-…</span><br>
+            <span class="role">terminal artifacts, manifest, cost trace</span></div>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:14px" class="muted">The identical engine and config run on a laptop with zero
+    AWS: in-memory state, local output folder, fixture pages, static voice. Environment
+    selects the backends; the code never branches.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">Functional flow</p>
+    <h2>The life of one account</h2>
+    <p>Real numbers from the verified Meridian Robotics runs. Every solid dot is a
+    <strong>checkpoint</strong> — written once to DynamoDB, replayed for free forever.
+    Dashed dots are idempotent writes that re-run on purpose.</p>
+    <ol class="rail">
+      <li><span class="ckpt"></span>
+        <div class="stage-head"><span class="stage-name">validate</span>
+          <span class="tier haiku">haiku</span><span class="stage-meta">1.3s · $0.0013 · parallel with identify</span></div>
+        <p>Required-field check is computed <em>in code</em> — the model only writes advisory
+        reasons (it was caught hallucinating field presence in both directions). Meridian:
+        <span class="ok">VALID</span>.</p>
+      </li>
+      <li><span class="ckpt"></span>
+        <div class="stage-head"><span class="stage-name">identify · fetch_pages</span>
+          <span class="tier none">tool</span><span class="stage-meta">fallback chain: attached → browser → fixture</span></div>
+        <p>The AgentCore Browser session hunts team/leadership pages, runs
+        <code>"&lt;company&gt; &lt;role&gt; LinkedIn"</code> searches per committee role, and a
+        funding/hiring signals pass. Raw page text checkpoints — <strong>a replay never
+        opens a browser</strong>. (Basecamp, a real account with no fixture: 8 pages fetched.)</p>
+      </li>
+      <li><span class="ckpt"></span>
+        <div class="stage-head"><span class="stage-name">identify · enrich</span>
+          <span class="tier sonnet">sonnet</span><span class="stage-meta">4.8s · $0.014 · the one model call in identification</span></div>
+        <p>Judges only what code can't: anchor quality, roles, LinkedIn presence — strictly
+        from the fetched pages. Empty pages → empty result, no model call, nothing invented.</p>
+      </li>
+      <li><span class="ckpt"></span>
+        <div class="stage-head"><span class="stage-name">identify · prioritize</span>
+          <span class="tier none">policy</span><span class="stage-meta">11ms · $0 · byte-identical port from poc1</span></div>
+        <p>The deterministic committee engine: extraction → 0–100 Contact Access score →
+        P1–P3. Meridian: <strong>68/B</strong> — CPO, CFO, IT Director; the IT Director's email is
+        composed from a HIGH-confidence <code>firstname.lastname</code> pattern (guessed
+        addresses attach <em>only</em> at high confidence — that's policy, in config).</p>
+      </li>
+      <li><span class="ckpt open"></span>
+        <div class="stage-head"><span class="stage-name">identify · persist_identified</span>
+          <span class="stage-meta">writes identified_contacts.json now — survives any later failure</span></div>
+      </li>
+      <li><span class="ckpt"></span>
+        <div class="stage-head"><span class="stage-name">verify × 7</span>
+          <span class="tier haiku">haiku</span><span class="stage-meta">17.5s threaded · $0.015 · one checkpoint per contact</span></div>
+        <p>4 CRM contacts + 3 identified. VERIFIED means a valid email <em>or</em> phone.
+        The junk "Dead Lead" fails; the pattern-guessed P3 passes.</p>
+      </li>
+      <li><span class="ckpt"></span>
+        <div class="stage-head"><span class="stage-name">reconcile → barrier</span>
+          <span class="tier none">policy</span><span class="stage-meta">9ms · alphabetical select-3, swappable in config</span></div>
+        <p>Selection: <strong>Alvarez, Berg, Krishnan</strong> — the identified IT Director makes the
+        final three. Then the declarative gate: <code>require: [account_valid, three_verified]</code>.</p>
+      </li>
+      <li><span class="ckpt"></span>
+        <div class="stage-head"><span class="stage-name">research + summary</span>
+          <span class="tier sonnet">sonnet</span><span class="stage-meta">19s · $0.022 · provenance-tagged, exactly 5 bullets</span></div>
+        <p>Company facts and trigger events, each origin-tagged. The 5-bullet brief is the
+        shared context every generator reuses — and "exactly 5" is enforced in code.</p>
+      </li>
+      <li><span class="ckpt"></span>
+        <div class="stage-head"><span class="stage-name">generate × 9</span>
+          <span class="tier opus">opus</span><span class="stage-meta">61s threaded · $0.27 — the cost center, checkpointed per artifact</span></div>
+        <p>3 contacts × (email + LinkedIn + call script). Each prompt carries the BDR's
+        <strong>voice from Memory</strong> — retrieved by <code>bdr_id</code>, static snippet as
+        fallback. Checkpoint keys like <code>gen#c-102#email</code> mean a crashed batch only
+        re-pays for what never finished.</p>
+      </li>
+      <li><span class="ckpt open"></span>
+        <div class="stage-head"><span class="stage-name">persist</span>
+          <span class="stage-meta">idempotent by key · re-runs on every replay · terminal: ARTIFACTS_QUEUED_REVIEW</span></div>
+        <p>Writes the summary, 9 artifacts, manifest, and cost trace to S3 in poc1's exact
+        key layout, then appends the account's event to Memory
+        (<em>"batch ran, 10 artifacts queued, access 68/B"</em>).</p>
+      </li>
+    </ol>
+
+    <div class="compare">
+      <div class="card">
+        <h3>Cold run</h3>
+        <div class="big">~36s <small>/ account</small></div>
+        <div class="kv">
+          <div><span>model calls</span><span>20 (1 haiku + 7 haiku + 3 sonnet + 9 opus)</span></div>
+          <div><span>checkpoints written</span><span>23</span></div>
+          <div><span>cost</span><span>$0.3193</span></div>
+        </div>
+      </div>
+      <div class="card replay">
+        <h3>Replay — same batch_id</h3>
+        <div class="big">0.8s <small>/ account</small></div>
+        <div class="kv">
+          <div><span>model calls</span><span>0</span></div>
+          <div><span>browser sessions</span><span>0</span></div>
+          <div><span>cost</span><span>~$0 — artifacts still re-verified on S3</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Observability</p>
+    <h2>Every run prices itself</h2>
+    <p>The engine times each checkpoint and captures token usage per stage; the table
+    below is the actual trace of one cold Meridian run (bar = share of total cost).</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>stage</th><th>tier</th><th class="num">calls</th><th class="num">tokens in/out</th><th class="num">usd</th><th style="width:30%">share</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">validate</td><td><span class="tier haiku">haiku</span></td><td class="num">1</td><td class="num">1,016 / 55</td><td class="num">0.0013</td><td><span class="bar haiku" style="width:2%"></span></td></tr>
+          <tr><td class="mono">enrich</td><td><span class="tier sonnet">sonnet</span></td><td class="num">1</td><td class="num">2,231 / 505</td><td class="num">0.0143</td><td><span class="bar sonnet" style="width:5%"></span></td></tr>
+          <tr><td class="mono">verify</td><td><span class="tier haiku">haiku</span></td><td class="num">7</td><td class="num">6,948 / 1,637</td><td class="num">0.0151</td><td><span class="bar haiku" style="width:5%"></span></td></tr>
+          <tr><td class="mono">research</td><td><span class="tier sonnet">sonnet</span></td><td class="num">1</td><td class="num">1,092 / 632</td><td class="num">0.0128</td><td><span class="bar sonnet" style="width:4%"></span></td></tr>
+          <tr><td class="mono">summary</td><td><span class="tier sonnet">sonnet</span></td><td class="num">1</td><td class="num">1,452 / 332</td><td class="num">0.0093</td><td><span class="bar sonnet" style="width:3%"></span></td></tr>
+          <tr><td class="mono">generate</td><td><span class="tier opus">opus</span></td><td class="num">9</td><td class="num">11,418 / 1,270</td><td class="num">0.2665</td><td><span class="bar opus" style="width:83%"></span></td></tr>
+          <tr class="total"><td>total</td><td></td><td class="num">25</td><td class="num">24,157 / 4,431</td><td class="num">0.3193</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:12px" class="muted">Generation is 83% of spend — exactly the slice the
+    write-once replay design makes free on re-runs. OTEL/X-Ray traces run by default via
+    AgentCore; <code>scripts/cost_report.py</code> prints this table for any past run.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">AgentCore Memory</p>
+    <h2>Same account, two BDRs, two voices</h2>
+    <p>With <code>voice: memory</code> in config, generators retrieve the BDR's seeded writing
+    exemplars. The same Meridian contact, generated for two different <code>bdr_id</code>s:</p>
+    <div class="grid2 voice">
+      <div class="card">
+        <h3>bdr-emea-07 <span class="mono">· casual seed · 9.1 words/sentence</span></h3>
+        <pre>subject: people data across EMEA
+
+hey tomas — running talent for 300+
+engineers across multiple countries
+sounds like a spreadsheet nightmare.
+[…]
+worth 15 min to see if it clicks?
+
+— sam</pre>
+      </div>
+      <div class="card">
+        <h3>bdr-na-04 <span class="mono">· formal seed · 12.6 words/sentence</span></h3>
+        <pre>Subject: Scaling people operations
+across EMEA at Meridian Robotics
+
+Dear Mr. Alvarez,
+[…] typically costs HR teams upward
+of 18 hours per week […] Would
+Wednesday 09:00–09:30 or Friday
+13:00–13:30 work?
+
+Kind regards,
+Jordan Ellis, BDR</pre>
+      </div>
+    </div>
+    <p style="margin-top:12px" class="muted">Local runs (no memory configured) fall back to the
+    static voice snippet automatically — nothing breaks offline.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">Gateway</p>
+    <h2>Internal tools over MCP — no secrets anywhere</h2>
+    <p>The <code>bdr-poc2-gateway</code> exposes internal Lambdas as MCP tools with
+    <strong>IAM-signed requests</strong> (no Cognito, no client secrets). First tool:
+    <code>crm_lookup</code>, proving the deferred enrichment contract — a pipeline stage
+    fed an account missing three required fields and got them all back:</p>
+    <pre class="code">validate   → NEEDS_ENRICHMENT  missing: [industry, size_band, hq_region]
+crm_enrich → found: true       filled: {industry: "Industrial Automation",
+                                        size_band: "201-500", hq_region: "EMEA"}
+             still_missing: []</pre>
+  </section>
+
+  <section>
+    <p class="eyebrow">Provenance</p>
+    <h2>Build history &amp; parity</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>phase</th><th>delivered</th><th>proof</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">0 · PR #2</td><td>Scaffold, pipeline schema + engine, migration tooling</td><td>demo pipeline runs from config; resources resolve per account</td></tr>
+          <tr><td class="mono">1 · PR #3</td><td>The poc1 product behind the engine (prioritizer byte-identical)</td><td>Meridian <b>68/B</b>, Northwind <b>59/C</b> reproduced from config alone</td></tr>
+          <tr><td class="mono">2 · PR #4</td><td>Runtime + DynamoDB + Step Functions envelope</td><td>cold 43s batch; replay <b>0.8s/account</b>; teardown + reinstall live</td></tr>
+          <tr><td class="mono">3 · PR #5</td><td>Live web fetch via the Browser tool (Exa reversed)</td><td>Basecamp identify lane end-to-end in AWS, no fixture</td></tr>
+          <tr><td class="mono">4 · PR #6</td><td>Memory: BDR voice + account event history</td><td>two BDRs, measurably different artifacts, config+memory only</td></tr>
+          <tr><td class="mono">5 · PR #7</td><td>Gateway MCP tools + cost observability + docs</td><td>enrichment filled via gateway; cost table per run; parity matrix green</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:14px">The parity matrix (<code>docs/PARITY.md</code>) tracks all 15 poc1
+    behaviors — every one demonstrated in poc2 — plus the four new capabilities. Deliberately
+    <em>not</em> built (post-parity roadmap): human review gates, the weekly scheduler,
+    Bedrock Guardrails, real CRM integration.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">Operations</p>
+    <h2>Running &amp; moving it</h2>
+    <ul class="plain">
+      <li><strong>Install anywhere:</strong> edit <code>config.json</code> (region, resource prefix, model IDs)
+        and run <code>python scripts/install.py</code> — it preflights model access and AgentCore
+        service availability before creating anything, then deploys the whole stack. Verified
+        by a foreign-prefix dry run that re-derived all 16 resource names from config alone.</li>
+      <li><strong>Run a batch:</strong> <code>python scripts/run_batch.py --batch-id b1</code> — a fresh id is a
+        cold run; the same id is the free replay. <code>--fixture-only</code> pins deterministic demo data.</li>
+      <li><strong>Inspect cost:</strong> <code>python scripts/cost_report.py b1 bdr-emea-07 acct-001</code>.</li>
+      <li><strong>Local, zero AWS:</strong> <code>python -m poc2.run pipelines/demo.yaml</code>; the full test suite
+        (<code>pytest -q</code>, 92 tests) never touches the network.</li>
+      <li><strong>Tear down:</strong> <code>python scripts/uninstall.py</code> removes everything the installer
+        created. Idle cost of the deployed stack is ~nil (no always-on compute).</li>
+    </ul>
+  </section>
+
+  <div class="footer">
+    ejs-sales-agents-poc2 · github.com/eddie5086/ejs-sales-agents-poc2 · deeper docs in-repo:
+    ARCHITECTURE.md · WORKFLOW.md · ACCOUNT-LIFECYCLE.md · PARITY.md · MIGRATION.md
+  </div>
+</main>
