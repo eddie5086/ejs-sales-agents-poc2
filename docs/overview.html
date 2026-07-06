@@ -402,6 +402,59 @@
   </section>
 
   <section>
+    <p class="eyebrow">Worked example</p>
+    <h2>One batch, three entry profiles</h2>
+    <p>The example batch (<code>mocks/sample_batch_mixed.json</code>) sends three accounts
+    with deliberately different starting points — rich CRM data, thin CRM data, and none at
+    all — through the deployed Step Functions envelope. All three reached
+    <code>ARTIFACTS_QUEUED_REVIEW</code> with 10 artifacts each.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>account</th><th class="num">existing contacts</th><th>access</th><th>email pattern</th><th>final selection</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Harborline Marine</td><td class="num">3</td>
+            <td class="mono">66/B</td><td>high confidence</td>
+            <td>all 3 from CRM — the identified candidates lost the alphabetical tiebreak to a rich verified pool of 6</td>
+          </tr>
+          <tr>
+            <td>Copperfield Foods</td><td class="num">1</td>
+            <td class="mono">51/C</td><td>moderate → P3 email withheld</td>
+            <td>1 CRM + 2 identified — the barrier passed with exactly 3 reachable contacts, zero slack</td>
+          </tr>
+          <tr>
+            <td>Atlas Terrain Robotics</td><td class="num">0</td>
+            <td class="mono">55/C</td><td>high confidence</td>
+            <td>all 3 from identification — outreach-ready with no CRM data at all</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="compare">
+      <div class="card">
+        <h3>Unplanned bonus: a real mid-run fault</h3>
+        <p>Harborline's first runtime invocation died with a transient
+        <code>RuntimeClientError</code>. Step Functions retried; the second attempt served the
+        <strong>20 finished checkpoints from DynamoDB and computed only the 2 that never
+        completed</strong> — manifest: <code>computed=2 cached=20</code>, done in 8.8s, zero
+        duplicate Opus spend. The recovery design, exercised by a genuine production fault.</p>
+      </div>
+      <div class="card replay">
+        <h3>Replay of the whole batch</h3>
+        <div class="big">2.8s <small>wall · 3 accounts</small></div>
+        <div class="kv">
+          <div><span>per account</span><span>0.8–0.9s</span></div>
+          <div><span>stages recomputed</span><span>0 of 61</span></div>
+          <div><span>model calls</span><span>0</span></div>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:12px" class="muted">Deterministic halves (pattern confidence, committee
+    ranking, selection, the withheld email) are identical run to run; access scores can drift a
+    few points because the Sonnet enrichment judgment samples at temperature 0.3.</p>
+  </section>
+
+  <section>
     <p class="eyebrow">Observability</p>
     <h2>Every run prices itself</h2>
     <p>The engine times each checkpoint and captures token usage per stage; the table
