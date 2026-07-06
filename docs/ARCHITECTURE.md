@@ -1,7 +1,8 @@
 # Architecture — as built (all six phases shipped)
 
 Companion docs: `WORKFLOW.md` (per-stage behavior), `ACCOUNT-LIFECYCLE.md`
-(one account end to end with real numbers), `PARITY.md` (matrix vs poc1).
+(one account end to end with real numbers), `DIAGRAMS.md` (Mermaid: component,
+flow, sequence, auth diagrams), `PARITY.md` (matrix vs poc1).
 
 ## The deployed system
 
