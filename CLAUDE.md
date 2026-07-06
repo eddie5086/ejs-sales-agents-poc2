@@ -246,5 +246,6 @@ python scripts/invoke_agentcore.py         # smoke-test one account on the deplo
 python scripts/run_batch.py --batch-id b1  # SFN batch (same id = replay, fresh id = cold)
 python scripts/seed_memory.py              # seed the two BDR voices
 python scripts/cost_report.py b1 bdr-emea-07 acct-001   # cost-per-stage table
+python scripts/render_diagrams.py          # re-render DIAGRAMS.md mermaid -> overview.html SVGs (needs node)
 python scripts/uninstall.py                # scripted teardown
 ```
