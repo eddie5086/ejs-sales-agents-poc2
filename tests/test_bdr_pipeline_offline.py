@@ -75,6 +75,11 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(
         persist_mod, "ArtifactStore",
         lambda: ArtifactStore(bucket="", local_dir=str(tmp_path)))
+    # The browser source must never touch AWS in offline tests; a hard failure
+    # here also proves the chain falls through to the fixture source.
+    from poc2.stages import browser_fetch
+    monkeypatch.setattr(browser_fetch, "_collect",
+                        lambda account, params: (_ for _ in ()).throw(RuntimeError("offline")))
     return tmp_path
 
 

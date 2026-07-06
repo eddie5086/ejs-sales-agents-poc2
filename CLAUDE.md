@@ -49,7 +49,7 @@ session reading this) is to implement it, phase by phase.
 | 0 — Scaffold + engine skeleton + migration tooling | ✅ done (2026-07-05) | 2-stage demo pipeline runs locally from config; `python -m deploy.config` prints resolved names — verified: 35 offline tests green, demo runs, resolved set correct on 296497502276, installer preflight passes |
 | 1 — Port the product behind the engine | ✅ done (2026-07-05) | local run vs real Bedrock reproduces poc1 output (Meridian 68/B, Northwind 59/C) from config alone — verified: 65 offline tests green (16 golden locked), real-Bedrock batch run hit every parity target (68/B + high-conf IT-Director email + trinet; 59/C + P3 email withheld at moderate conf + rippling), 10 artifacts/account in the §11.2 layout |
 | 2 — Deploy the envelope (Runtime + DynamoDB + SFN) | ✅ done (2026-07-05) | AWS batch run + sub-second idempotent replay — verified: install.py deployed the full stack; 2-account SFN batch cold in 43s wall (23 stages/account, 68/B + 59/C reproduced in AWS); replay of the same batch_id at 0.8s/account, computed=0 cached=23; uninstall.py tore down all 8 resources and re-runs clean; stack reinstalled after |
-| 3 — Live web fetch via AgentCore Browser tool | ❌ | identify lane fetches via Browser for a real company; fixtures still work |
+| 3 — Live web fetch via AgentCore Browser tool | ✅ done (2026-07-05) | identify lane fetches via Browser for a real company; fixtures still work — verified: Basecamp (no fixture) completed the identify lane in AWS via aws.browser.v1 (site pages + role-targeted SERPs), fixture path green in 77 offline tests, replay served fetch_pages from checkpoint (0 computed, no browser session) |
 | 4 — AgentCore Memory (BDR voice + account history) | ❌ | two BDRs get distinguishably different voice from config+memory only |
 | 5 — Gateway (internal MCP tools) + Observability + docs | ❌ | parity matrix vs poc1 all green + new capabilities demonstrated |
 
@@ -162,6 +162,35 @@ access blocks apply, see `docs/AWS-GOTCHAS.md` §1.
   conflict — it now treats DELETING/ConflictException as already-done.
 - `.dockerignore` keeps .venv/tests/docs out of the CodeBuild image;
   mocks/prompts/pipelines DO ship in it (fixtures gotcha, AWS-GOTCHAS §2).
+
+## Phase 3 notes
+
+- `poc2/stages/browser_fetch.py` implements the full BDRAWSRESEARCHTOOL
+  contacts.md recipe: Pass A team/leadership pages (direct domain paths +
+  DuckDuckGo discovery), Pass B role-targeted `"<company>" "<role>" LinkedIn`
+  searches (the SERP text is captured as evidence — LinkedIn itself is
+  auth-walled), Pass C signals query. Playwright over CDP against the
+  aws.browser.v1 session (`browser_session` from the bedrock-agentcore SDK).
+- **Best-effort contract**: any browser failure (no SDK, no credentials,
+  region without the tool, timeouts) returns [] and the config chain falls
+  through — that IS the fixture-offline story; offline tests stub `_collect`
+  to raise and assert the fixture serves.
+- Replay never opens a browser: engine-inherent (`fetch_pages` checkpoints
+  its raw output; invariant 2 of ARCHITECTURE.md).
+- `pipelines/identify_only.yaml`: same stages, shorter flow — the Phase 3
+  exit-criterion pipeline for real accounts (full pipeline would stop at the
+  barrier when a cold real account can't verify 3 contacts; that's correct
+  behavior, not a Phase 3 gap). `mocks/real_account.json` = Basecamp.
+- Installer growth: `BdrBrowserTool` policy on the execution role (session
+  ARNs are dynamic → resource `*`), and install.py preflights
+  `get_browser(aws.browser.v1)` region availability.
+- **Invoke-time `param_overrides`** (`payload.param_overrides: {stage_id:
+  {key: value}}`, threaded through the SFN ItemSelector and Lambda proxy):
+  the fictional mock domains are parked/squatted on the real web, so a
+  deployed browser-first batch would fetch garbage for them —
+  `run_batch.py --fixture-only` pins `fetch: [attached, fixture]` for
+  deterministic parity runs without a second pipeline YAML. Replay
+  invariants unaffected (stored checkpoints always win).
 
 ## Commands
 

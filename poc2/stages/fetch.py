@@ -62,7 +62,11 @@ def _fetch_fixture(account, ctx) -> List[dict]:
 
 
 _SOURCES = {"attached": _fetch_attached, "fixture": _fetch_fixture}
-# Phase 3 registers "browser" here (AgentCore Browser tool).
+
+
+def register_source(name: str, fn) -> None:
+    """Extend the fetch chain (browser_fetch.py registers "browser" here)."""
+    _SOURCES[name] = fn
 
 
 @register("tool", "fetch_pages")

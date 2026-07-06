@@ -54,7 +54,8 @@ def handler(payload: dict) -> dict:
     engine = Engine(config, state=StateStore())
     result = engine.run(
         batch_id, account.get("account_id", "unknown"),
-        {"account": account, "_started_at": time.time()},
+        {"account": account, "_started_at": time.time(),
+         "param_overrides": payload.get("param_overrides") or {}},
     )
     manifest = result.outputs.get("persist")
     if isinstance(manifest, dict):

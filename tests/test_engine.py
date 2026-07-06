@@ -191,6 +191,21 @@ def test_barrier_unsatisfied_halts_pipeline():
     assert store.computed == ["greet"]  # shout never ran
 
 
+def test_param_overrides_from_payload():
+    """Invoke-time param_overrides merge over stage params (e.g. pinning the
+    fetch chain for parity runs) without touching the versioned YAML."""
+    cfg = _pipeline({
+        "name": "t",
+        "stages": [{"id": "greet", "kind": "policy", "strategy": "template",
+                    "params": {"template": "hi {company}"}}],
+        "flow": ["greet"],
+    })
+    payload = {"company": "Acme",
+               "param_overrides": {"greet": {"template": "OVERRIDDEN {company}"}}}
+    result = Engine(cfg).run("b", "a", payload)
+    assert result.outputs["greet"] == "OVERRIDDEN Acme"
+
+
 def test_unregistered_strategy_is_an_error():
     cfg = _pipeline({
         "name": "t",

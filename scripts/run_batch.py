@@ -27,10 +27,18 @@ def main() -> int:
     p.add_argument("batch", nargs="?", default="mocks/sample_batch.json")
     p.add_argument("--batch-id", required=True,
                    help="fresh id = cold run; repeated id = replay")
+    p.add_argument("--fixture-only", action="store_true",
+                   help="pin the fetch chain to [attached, fixture] — deterministic "
+                        "parity runs for the fictional mock accounts (their parked "
+                        "domains would otherwise feed the browser garbage)")
     args = p.parse_args()
 
     batch = json.loads(Path(args.batch).read_text())
-    payload = {"batch_id": args.batch_id, "accounts": batch["accounts"]}
+    # param_overrides is always present — the ASL ItemSelector references it.
+    payload = {"batch_id": args.batch_id, "accounts": batch["accounts"],
+               "param_overrides": {}}
+    if args.fixture_only:
+        payload["param_overrides"] = {"fetch_pages": {"fetch": ["attached", "fixture"]}}
 
     sfn = boto3.client("stepfunctions", region_name=C.region())
     sm_arn = f"arn:aws:states:{C.region()}:{C.account_id()}:stateMachine:{C.sfn_name()}"
