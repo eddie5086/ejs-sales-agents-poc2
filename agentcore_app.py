@@ -57,14 +57,29 @@ def handler(payload: dict) -> dict:
         {"account": account, "_started_at": time.time(),
          "param_overrides": payload.get("param_overrides") or {}},
     )
+
+    # Phase 5 observability: persist the raw trace next to the artifacts and
+    # return the aggregated cost-per-stage table with the manifest.
+    from poc2 import observability
+    from poc2.storage import ArtifactStore
+
+    table = observability.cost_table(result.trace)
+    try:
+        prefix = f"{batch_id}/{account.get('bdr_id', 'unknown')}/{result.account_id}"
+        ArtifactStore().put_json(f"{prefix}/_trace.json",
+                                 {"trace": result.trace, "cost_table": table})
+    except Exception as e:  # tracing must never fail a run
+        print(f"  [observability] trace persist failed: {e}")
+
     manifest = result.outputs.get("persist")
     if isinstance(manifest, dict):
-        return manifest
-    # Pipelines without a persist stage (e.g. demo): return a slim summary.
+        return {**manifest, "cost_table": table}
+    # Pipelines without a persist stage (e.g. demo/identify_only): slim summary.
     return {
         "pipeline": result.pipeline, "batch_id": result.batch_id,
         "account_id": result.account_id,
         "computed": len(result.computed), "cached": len(result.cached),
+        "cost_table": table,
     }
 
 

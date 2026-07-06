@@ -57,6 +57,18 @@ def preflight_browser_tool() -> bool:
         return False
 
 
+def preflight_gateway_service() -> bool:
+    """Region availability of AgentCore Gateway (MIGRATION.md §5)."""
+    control = boto3.client("bedrock-agentcore-control", region_name=C.region())
+    try:
+        control.list_gateways(maxResults=1)
+        print("  OK    AgentCore Gateway service available")
+        return True
+    except Exception as e:
+        print(f"  FAIL  AgentCore Gateway not available in {C.region()}: {e}")
+        return False
+
+
 def preflight_memory_service() -> bool:
     """Region availability of AgentCore Memory (MIGRATION.md §5)."""
     control = boto3.client("bedrock-agentcore-control", region_name=C.region())
@@ -98,12 +110,16 @@ def main() -> int:
         print("\nAgentCore Memory backs BDR voice + account history (Phase 4). "
               "Pick a region where it is available. Aborting.")
         return 1
+    if not preflight_gateway_service():
+        print("\nAgentCore Gateway backs internal MCP tools (Phase 5). "
+              "Pick a region where it is available. Aborting.")
+        return 1
 
     run("deploy_memory.py")         # memory store (before runtime: env carries its name)
+    run("deploy_gateway.py")        # gateway + mock CRM tool (before runtime, same reason)
     run("deploy_agentcore.py")      # S3 bucket + runtime + role policies
     run("deploy_dynamodb.py")       # state table
     run("deploy_stepfunctions.py")  # Lambda proxy + state machine
-    # Phase 5: Gateway lands here.
 
     print("\nDONE — stack installed. Smoke test:\n  python scripts/invoke_agentcore.py\n"
           "Batch:\n  python scripts/run_batch.py --batch-id batch-fresh-001\n"

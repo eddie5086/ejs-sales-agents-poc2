@@ -1,0 +1,19 @@
+# Phase 5 exit-criterion pipeline: the §4.3 enrichment contract through the
+# AgentCore Gateway. An incomplete account fails validation deterministically;
+# the crm_enrich stage fills the missing firmographics from the CRM tool over
+# MCP. (The auto-apply loop-back into re-validation stays on the roadmap —
+# this proves the tool contract from a pipeline stage.)
+name: enrich_demo
+stages:
+  - id: validate
+    kind: agent
+    tier: haiku
+    strategy: deterministic_fields
+    prompt: prompts/validate.md
+    params: {required_fields: [name, domain, industry, size_band, hq_region]}
+  - id: crm_enrich
+    kind: tool
+    strategy: gateway_crm_lookup
+    params: {fields: [industry, size_band, hq_region]}
+flow:
+  - {parallel: [validate, crm_enrich]}

@@ -51,7 +51,7 @@ session reading this) is to implement it, phase by phase.
 | 2 — Deploy the envelope (Runtime + DynamoDB + SFN) | ✅ done (2026-07-05) | AWS batch run + sub-second idempotent replay — verified: install.py deployed the full stack; 2-account SFN batch cold in 43s wall (23 stages/account, 68/B + 59/C reproduced in AWS); replay of the same batch_id at 0.8s/account, computed=0 cached=23; uninstall.py tore down all 8 resources and re-runs clean; stack reinstalled after |
 | 3 — Live web fetch via AgentCore Browser tool | ✅ done (2026-07-05) | identify lane fetches via Browser for a real company; fixtures still work — verified: Basecamp (no fixture) completed the identify lane in AWS via aws.browser.v1 (site pages + role-targeted SERPs), fixture path green in 77 offline tests, replay served fetch_pages from checkpoint (0 computed, no browser session) |
 | 4 — AgentCore Memory (BDR voice + account history) | ✅ done (2026-07-05) | two BDRs get distinguishably different voice from config+memory only — verified: same account, bdr-emea-07 vs bdr-na-04, `voice: memory` produced clearly distinct email artifacts (casual/punchy vs formal/metric-led); local runs fall back to static (84 offline tests, zero AWS); account events appended per batch run |
-| 5 — Gateway (internal MCP tools) + Observability + docs | ❌ | parity matrix vs poc1 all green + new capabilities demonstrated |
+| 5 — Gateway (internal MCP tools) + Observability + docs | ✅ done (2026-07-05) | parity matrix vs poc1 all green + new capabilities demonstrated — verified: docs/PARITY.md all green; `enrich_demo.yaml` filled missing firmographics via the gateway's `crm_lookup` MCP tool from a pipeline stage in AWS; cost-per-stage table in every manifest + `scripts/cost_report.py`; MIGRATION §8 foreign-prefix dry run re-derived every name |
 
 ## Decisions locked (2026-07-05 — do not relitigate)
 
@@ -211,6 +211,28 @@ access blocks apply, see `docs/AWS-GOTCHAS.md` §1.
 - `invoke_agentcore.py` grew `--bdr` (override bdr_id) and `--fixture-only`
   for the two-voice exit-criterion comparison.
 
+## Phase 5 notes
+
+- **Gateway auth is AWS_IAM** (SigV4-signed MCP calls from the runtime role) —
+  no Cognito, no client secrets anywhere. Gateway URL auto-discovered from
+  `GATEWAY_NAME` (empty = disabled; gateway tool stages raise a clear error
+  rather than fake an enrichment). Tool names are `{target}___{tool}`;
+  `poc2/gateway.py` defaults bare names to the `crm` target.
+- The mock CRM Lambda (`{prefix}-crm-lookup`, canned data for the three
+  known domains) proves the §4.3 contract via `pipelines/enrich_demo.yaml`
+  (`crm_enrich` stage reports `filled_fields` / `still_missing`). The
+  auto-apply → re-validate loop-back stays on the roadmap.
+- **Cost-per-stage observability**: the engine times every checkpoint; the
+  agent factory (`_TrackedAgent`) reports per-thread token usage; every run
+  persists `_trace.json` beside its artifacts and the manifest response
+  carries the aggregated table (`poc2/observability.py` holds the per-MTok
+  price map — update it with model-tier changes). `scripts/cost_report.py
+  <batch> <bdr> <account>` prints the table after the fact. OTEL/X-Ray stays
+  on by default via AgentCore.
+- deploy_gateway.py retries target creation (freshly-READY gateway can
+  transiently reject it); uninstall removes gateway, targets, CRM lambda +
+  roles. Final docs: `docs/WORKFLOW.md` (poc2), `docs/PARITY.md` (the matrix).
+
 ## Commands
 
 ```bash
@@ -222,5 +244,7 @@ python -m deploy.config                    # print resolved per-account resource
 python scripts/install.py                  # preflight + deploy the whole stack
 python scripts/invoke_agentcore.py         # smoke-test one account on the deployed runtime
 python scripts/run_batch.py --batch-id b1  # SFN batch (same id = replay, fresh id = cold)
+python scripts/seed_memory.py              # seed the two BDR voices
+python scripts/cost_report.py b1 bdr-emea-07 acct-001   # cost-per-stage table
 python scripts/uninstall.py                # scripted teardown
 ```

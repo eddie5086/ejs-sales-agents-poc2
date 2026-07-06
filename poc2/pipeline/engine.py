@@ -15,10 +15,12 @@ Engine rules (docs/ARCHITECTURE.md):
 """
 from __future__ import annotations
 
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from poc2 import observability
 from poc2.pipeline import registry
 from poc2.pipeline.schema import (
     FAN_OUT_SOURCES, Barrier, ParallelGroup, PipelineConfig, StageConfig,
@@ -63,12 +65,16 @@ class RunResult:
     outputs: dict[str, Any] = field(default_factory=dict)
     computed: list[str] = field(default_factory=list)
     cached: list[str] = field(default_factory=list)
+    # Per-checkpoint observability records (Phase 5): key, tier, cached,
+    # elapsed_ms, tokens_in/out, cost_usd. Never checkpointed itself.
+    trace: list[dict] = field(default_factory=list)
 
 
 class Engine:
     def __init__(self, config: PipelineConfig, state: Optional[StateStore] = None):
         self.config = config
         self.state = state if state is not None else StateStore(table="")
+        self.trace: list[dict] = []
 
     def run(self, batch_id: str, account_id: str, payload: Optional[dict] = None) -> RunResult:
         payload = payload or {}
@@ -95,7 +101,7 @@ class Engine:
         return RunResult(
             pipeline=self.config.name, batch_id=batch_id, account_id=account_id,
             outputs=outputs, computed=list(self.state.computed),
-            cached=list(self.state.cached),
+            cached=list(self.state.cached), trace=list(self.trace),
         )
 
     # ---- stage execution ---------------------------------------------------
@@ -122,8 +128,31 @@ class Engine:
                            batch_id=batch_id, account_id=account_id, state=self.state)
         if not stage.checkpoint:
             # Idempotent-by-key persist stages run on every replay.
-            return fn(ctx)
-        return self.state.checkpoint(batch_id, account_id, stage.id, lambda: fn(ctx))
+            return self._traced(stage.id, stage.tier, lambda: fn(ctx), checkpointed=False,
+                                batch_id=batch_id, account_id=account_id)
+        return self._traced(stage.id, stage.tier, lambda: fn(ctx),
+                            batch_id=batch_id, account_id=account_id)
+
+    def _traced(self, key: str, tier: Optional[str], compute, *,
+                batch_id: str, account_id: str, checkpointed: bool = True) -> Any:
+        """Run one checkpoint (or direct call) under the observability clock:
+        wall time + the model tokens the compute reported on this thread."""
+        observability.reset_usage()
+        t0 = time.perf_counter()
+        if checkpointed:
+            result = self.state.checkpoint(batch_id, account_id, key, compute)
+            cached = key in self.state.cached
+        else:
+            result = compute()
+            cached = False
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        tokens_in, tokens_out = observability.take_usage()
+        self.trace.append({
+            "key": key, "tier": tier, "cached": cached, "elapsed_ms": elapsed_ms,
+            "tokens_in": tokens_in, "tokens_out": tokens_out,
+            "cost_usd": observability.cost_usd(tier, tokens_in, tokens_out),
+        })
+        return result
 
     def _fan_items(self, stage: StageConfig, payload: dict, outputs: dict) -> list:
         """Items to fan over: a registered provider named by params.items_from
@@ -166,7 +195,8 @@ class Engine:
 
         def run_one(job):
             key, ctx = job
-            return self.state.checkpoint(batch_id, account_id, key, lambda: fn(ctx))
+            return self._traced(key, stage.tier, lambda: fn(ctx),
+                                batch_id=batch_id, account_id=account_id)
 
         with ThreadPoolExecutor(max_workers=min(len(jobs), 9)) as pool:
             return list(pool.map(run_one, jobs))
