@@ -50,7 +50,7 @@ session reading this) is to implement it, phase by phase.
 | 1 — Port the product behind the engine | ✅ done (2026-07-05) | local run vs real Bedrock reproduces poc1 output (Meridian 68/B, Northwind 59/C) from config alone — verified: 65 offline tests green (16 golden locked), real-Bedrock batch run hit every parity target (68/B + high-conf IT-Director email + trinet; 59/C + P3 email withheld at moderate conf + rippling), 10 artifacts/account in the §11.2 layout |
 | 2 — Deploy the envelope (Runtime + DynamoDB + SFN) | ✅ done (2026-07-05) | AWS batch run + sub-second idempotent replay — verified: install.py deployed the full stack; 2-account SFN batch cold in 43s wall (23 stages/account, 68/B + 59/C reproduced in AWS); replay of the same batch_id at 0.8s/account, computed=0 cached=23; uninstall.py tore down all 8 resources and re-runs clean; stack reinstalled after |
 | 3 — Live web fetch via AgentCore Browser tool | ✅ done (2026-07-05) | identify lane fetches via Browser for a real company; fixtures still work — verified: Basecamp (no fixture) completed the identify lane in AWS via aws.browser.v1 (site pages + role-targeted SERPs), fixture path green in 77 offline tests, replay served fetch_pages from checkpoint (0 computed, no browser session) |
-| 4 — AgentCore Memory (BDR voice + account history) | ❌ | two BDRs get distinguishably different voice from config+memory only |
+| 4 — AgentCore Memory (BDR voice + account history) | ✅ done (2026-07-05) | two BDRs get distinguishably different voice from config+memory only — verified: same account, bdr-emea-07 vs bdr-na-04, `voice: memory` produced clearly distinct email artifacts (casual/punchy vs formal/metric-led); local runs fall back to static (84 offline tests, zero AWS); account events appended per batch run |
 | 5 — Gateway (internal MCP tools) + Observability + docs | ❌ | parity matrix vs poc1 all green + new capabilities demonstrated |
 
 ## Decisions locked (2026-07-05 — do not relitigate)
@@ -191,6 +191,25 @@ access blocks apply, see `docs/AWS-GOTCHAS.md` §1.
   `run_batch.py --fixture-only` pins `fetch: [attached, fixture]` for
   deterministic parity runs without a second pipeline YAML. Replay
   invariants unaffected (stored checkpoints always win).
+
+## Phase 4 notes
+
+- One Memory store (`{prefix with underscores}_memory`, short-term events
+  only — no extraction strategies, retrieval is verbatim/deterministic):
+  voice exemplars at `actor bdr/{bdr_id} / session voice`, account history
+  at `actor acct/{account_id} / session {batch_id}`. Memory ID auto-discovered
+  from the name (MIGRATION §4); `MEMORY_NAME` env is the on/off switch —
+  empty (every local run) disables memory, so `voice: memory` silently falls
+  back to the static snippet and event appends are no-ops. All memory access
+  is best-effort (`poc2/memory.py`); failures never take a pipeline down.
+- `scripts/deploy_memory.py` (create_or_get, idempotent, runs FIRST in
+  install.py so runtime env can carry the name), `scripts/seed_memory.py`
+  (two contrasting voices: bdr-emea-07 casual/punchy, bdr-na-04
+  formal/metric-led). Execution role grew the `BdrMemory` policy.
+- Voice retrieval happens inside the checkpointed generate stages, so
+  replays don't re-read memory (same invariant as browser fetch).
+- `invoke_agentcore.py` grew `--bdr` (override bdr_id) and `--fixture-only`
+  for the two-voice exit-criterion comparison.
 
 ## Commands
 

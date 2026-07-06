@@ -64,6 +64,11 @@ class Settings:
     # so local runs need no DynamoDB. The AWS runtime sets this to a real table.
     state_ddb_table: str = field(default_factory=lambda: _env("STATE_DDB_TABLE", ""))
 
+    # AgentCore Memory store name (Phase 4). Empty -> memory features off:
+    # voice falls back to the static snippet, account events are skipped.
+    # The AWS runtime sets this via deploy.config.runtime_env.
+    memory_name: str = field(default_factory=lambda: _env("MEMORY_NAME", ""))
+
     def model_for_tier(self, tier: str) -> str:
         return {"haiku": self.model_haiku, "sonnet": self.model_sonnet, "opus": self.model_opus}[
             tier

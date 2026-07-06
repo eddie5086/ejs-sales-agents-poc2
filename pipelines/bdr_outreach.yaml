@@ -71,7 +71,7 @@ stages:
     artifacts: [email, linkedin, talk_track]   # 3 contacts x 3 = 9 Opus checkpoints
     params:
       items_from: selected_contacts
-      voice: static                  # memory (Phase 4) | static
+      voice: memory                  # memory | static; static file is the fallback
       voice_prompt: prompts/voice_static.md
       product_prompt: prompts/product_context.md
       prompts:

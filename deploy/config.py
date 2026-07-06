@@ -119,6 +119,13 @@ def ecr_repo() -> str:
     return f"bedrock-agentcore-{agent_name()}"
 
 
+def memory_name() -> str:
+    """AgentCore Memory store (Phase 4). Memory names disallow hyphens —
+    same rule as agent names — so the prefix maps to underscores. The memory
+    ID (name + random suffix) is auto-discovered by matching this name."""
+    return f"{prefix().replace('-', '_')}_memory"
+
+
 def runtime_env() -> dict:
     """Environment injected into the AgentCore runtime at deploy time."""
     m = models()
@@ -129,6 +136,7 @@ def runtime_env() -> dict:
         "BEDROCK_MODEL_HAIKU": m["haiku"],
         "BEDROCK_MODEL_SONNET": m["sonnet"],
         "BEDROCK_MODEL_OPUS": m["opus"],
+        "MEMORY_NAME": memory_name(),  # empty MEMORY_NAME = memory disabled
     }
 
 
@@ -184,6 +192,7 @@ def resolved() -> dict:
         "lambda_role": lambda_role(),
         "state_machine": sfn_name(),
         "state_machine_role": sfn_role(),
+        "memory_name": memory_name(),
         "models": models(),
     }
 

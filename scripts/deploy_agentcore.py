@@ -84,12 +84,25 @@ def grant_execution_role() -> None:
                         "bedrock-agentcore:UpdateBrowserStream"],
              "Resource": "*"},
         ],
+        # Phase 4: voice retrieval + account event history in AgentCore
+        # Memory (memory id carries a random suffix -> resource *).
+        "BdrMemory": [
+            {"Effect": "Allow",
+             "Action": ["bedrock-agentcore:ListMemories",
+                        "bedrock-agentcore:GetMemory",
+                        "bedrock-agentcore:CreateEvent",
+                        "bedrock-agentcore:ListEvents",
+                        "bedrock-agentcore:ListSessions",
+                        "bedrock-agentcore:ListActors",
+                        "bedrock-agentcore:RetrieveMemoryRecords"],
+             "Resource": "*"},
+        ],
     }
     for name, statements in policies.items():
         iam.put_role_policy(RoleName=role, PolicyName=name,
                             PolicyDocument=json.dumps({"Version": "2012-10-17",
                                                        "Statement": statements}))
-    print(f"  granted {role}: S3 + ECR + DynamoDB + Browser")
+    print(f"  granted {role}: S3 + ECR + DynamoDB + Browser + Memory")
 
 
 def main() -> int:

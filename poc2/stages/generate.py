@@ -6,9 +6,11 @@ talk_track]` into 9 checkpointed jobs (`gen#<contact_id>#<artifact>`); this
 strategy handles ONE (contact, artifact) pair per invocation. Prompts live in
 per-artifact files (system prompt above the `---` line, instruction below).
 
-Voice: `voice: static` reads the baseline snippet file (poc1's inline
-BDR_VOICE_BASELINE, externalized). AgentCore Memory (`voice: memory`) lands in
-Phase 4 behind the same param.
+Voice: `voice: memory` retrieves the BDR's exemplars from AgentCore Memory by
+the account's `bdr_id`; the static snippet file (poc1's inline
+BDR_VOICE_BASELINE, externalized) is the fallback whenever memory is
+disabled (MEMORY_NAME empty — every local run) or holds no exemplars for
+that BDR. `voice: static` skips memory entirely.
 """
 from __future__ import annotations
 
@@ -20,8 +22,14 @@ from poc2.stages.common import account_from, load_prompt, load_prompt_sections
 
 def _voice(ctx) -> str:
     mode = ctx.params.get("voice", "static")
-    if mode != "static":
-        raise ValueError(f"voice mode {mode!r} not available until Phase 4")
+    if mode not in ("static", "memory"):
+        raise ValueError(f"unknown voice mode in config: {mode!r}")
+    if mode == "memory":
+        from poc2 import memory
+
+        exemplars = memory.get_bdr_voice(account_from(ctx.payload).bdr_id)
+        if exemplars:
+            return f"Voice exemplars from this BDR (match their style):\n{exemplars}"
     return load_prompt(ctx.params["voice_prompt"])
 
 
