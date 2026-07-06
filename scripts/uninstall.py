@@ -121,6 +121,28 @@ def delete_agent_runtime() -> None:
             raise
 
 
+def delete_memory_store() -> None:
+    client = boto3.client("bedrock-agentcore-control", region_name=C.region())
+    name = C.memory_name()
+    try:
+        memories = client.list_memories().get("memories", [])
+    except Exception as e:
+        print(f"  --    could not list AgentCore memories ({e}); skipping")
+        return
+    match = [m for m in memories
+             if (m.get("id") or "").split("-")[0] == name]
+    if not match:
+        return _gone("agentcore memory", name)
+    try:
+        client.delete_memory(memoryId=match[0]["id"])
+        _deleted("agentcore memory", name)
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "ConflictException":
+            print(f"  --    agentcore memory '{name}' already deleting")
+        else:
+            raise
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--yes", action="store_true", help="skip confirmation")
@@ -130,7 +152,8 @@ def main() -> int:
     print("Will delete (if they exist):")
     r = C.resolved()
     for key in ("state_machine", "lambda_name", "dynamodb_table", "artifact_bucket",
-                "ecr_repo", "lambda_role", "state_machine_role", "agent_name"):
+                "ecr_repo", "lambda_role", "state_machine_role", "agent_name",
+                "memory_name"):
         print(f"  {key}: {r[key]}")
 
     if not args.yes:
@@ -145,6 +168,7 @@ def main() -> int:
     delete_ecr_repo()
     delete_roles()
     delete_agent_runtime()
+    delete_memory_store()
     print("\nDONE — teardown complete.")
     return 0
 

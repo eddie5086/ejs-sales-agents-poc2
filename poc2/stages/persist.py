@@ -71,8 +71,20 @@ def artifact_writer(ctx) -> dict:
         },
         "pipeline": ctx.outputs.get("_pipeline_name", "bdr_outreach"),
         "deferred": ["hitl_gate_1", "hitl_gate_2", "enrichment_loopback",
-                     "browser_fetch(phase3)", "memory_voice(phase4)",
                      "gateway_tools(phase5)", "guardrails"],
     }
     manifest_uri = store.put_json(f"{prefix}/_manifest.json", manifest)
-    return {**manifest, "manifest_uri": manifest_uri, "store_backend": store.backend}
+
+    # Phase 4: append the account's event history (best-effort; no-op when
+    # MEMORY_NAME is empty, e.g. every local run).
+    from poc2 import memory
+    event_logged = memory.append_account_event(
+        account.account_id, ctx.batch_id,
+        f"batch {ctx.batch_id} ran for {account.account_id} (bdr {account.bdr_id}): "
+        f"{manifest['artifact_count']} artifacts queued for review, access "
+        f"{identification.access_score}/{identification.grade}, "
+        f"computed={manifest['idempotency']['computed']} "
+        f"cached={manifest['idempotency']['cached']}")
+
+    return {**manifest, "manifest_uri": manifest_uri, "store_backend": store.backend,
+            "account_event_logged": event_logged}

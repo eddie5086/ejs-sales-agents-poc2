@@ -29,12 +29,20 @@ def main() -> int:
     p.add_argument("--batch", default="batch-agentcore-001")
     p.add_argument("--pipeline", default=None,
                    help="pipeline YAML inside the image (default: bdr_outreach)")
+    p.add_argument("--bdr", default=None, help="override the account's bdr_id")
+    p.add_argument("--fixture-only", action="store_true",
+                   help="pin the fetch chain to [attached, fixture]")
     args = p.parse_args()
 
     account = json.loads(Path(args.account).read_text())
+    if args.bdr:
+        account["bdr_id"] = args.bdr
     body_payload = {"account": account, "batch_id": args.batch}
     if args.pipeline:
         body_payload["pipeline"] = args.pipeline
+    if args.fixture_only:
+        body_payload["param_overrides"] = {
+            "fetch_pages": {"fetch": ["attached", "fixture"]}}
     payload = json.dumps(body_payload)
 
     client = boto3.client("bedrock-agentcore", region_name=REGION)

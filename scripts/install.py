@@ -57,6 +57,18 @@ def preflight_browser_tool() -> bool:
         return False
 
 
+def preflight_memory_service() -> bool:
+    """Region availability of AgentCore Memory (MIGRATION.md §5)."""
+    control = boto3.client("bedrock-agentcore-control", region_name=C.region())
+    try:
+        control.list_memories(maxResults=1)
+        print("  OK    AgentCore Memory service available")
+        return True
+    except Exception as e:
+        print(f"  FAIL  AgentCore Memory not available in {C.region()}: {e}")
+        return False
+
+
 def main() -> int:
     print("=== preflight: config.json lint ===")
     problems = C.validate()
@@ -82,14 +94,20 @@ def main() -> int:
         print("\nThe Browser tool backs the identify lane's live fetch (Phase 3). "
               "Pick a region where AgentCore Browser is available. Aborting.")
         return 1
+    if not preflight_memory_service():
+        print("\nAgentCore Memory backs BDR voice + account history (Phase 4). "
+              "Pick a region where it is available. Aborting.")
+        return 1
 
+    run("deploy_memory.py")         # memory store (before runtime: env carries its name)
     run("deploy_agentcore.py")      # S3 bucket + runtime + role policies
     run("deploy_dynamodb.py")       # state table
     run("deploy_stepfunctions.py")  # Lambda proxy + state machine
-    # Phase 3+: Browser / Memory / Gateway permissions and stores land here.
+    # Phase 5: Gateway lands here.
 
     print("\nDONE — stack installed. Smoke test:\n  python scripts/invoke_agentcore.py\n"
-          "Batch:\n  python scripts/run_batch.py --batch-id batch-fresh-001")
+          "Batch:\n  python scripts/run_batch.py --batch-id batch-fresh-001\n"
+          "Seed BDR voices:\n  python scripts/seed_memory.py")
     return 0
 
 
