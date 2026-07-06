@@ -1,73 +1,62 @@
 # Diagrams — components, flows, and agent invocations
 
 All diagrams are Mermaid (GitHub renders them inline). SVG renders of the
-same diagrams are embedded in `docs/overview.html`. Companions:
-`ARCHITECTURE.md` (prose), `ACCOUNT-LIFECYCLE.md` (numbers).
+same diagrams are embedded in `docs/overview.html` via
+`scripts/render_diagrams.py`. Node labels stay terse on purpose — the detail
+lives in the prose around each diagram and in `ARCHITECTURE.md` /
+`ACCOUNT-LIFECYCLE.md`.
 
 ## 1 · End-to-end system flow
 
-Batch in, artifacts out — every component in the deployed path.
+Batch in, artifacts out. The Lambda exists because Step Functions has no
+native AgentCore integration; it threads `batch_id` and `param_overrides`
+through to the runtime.
 
 ```mermaid
 flowchart TB
-    OP["Operator / scheduler\nrun_batch.py --batch-id"] -->|"batch_id + accounts[] + param_overrides"| SFN
-
-    subgraph envelope ["Batch envelope (Step Functions)"]
-        SFN["bdr-poc2-batch-envelope\nMap over accounts · MaxConcurrency 3 · 50% tolerance"]
-    end
-
-    SFN -->|"one iteration per account"| LAM["Lambda bdr-poc2-invoke-account\n(SFN has no native AgentCore integration)"]
-    LAM -->|"invoke_agent_runtime (payload: account, batch_id, param_overrides)"| RT
-
-    subgraph runtime ["AgentCore Runtime · bdr_poc2_account_runner"]
-        RT["agentcore_app.handler"] --> ENG["Pipeline Engine\nloads + lints pipelines/bdr_outreach.yaml"]
-    end
-
-    ENG <-->|"write-once checkpoints\n(batch, account, stage)"| DDB[("DynamoDB\nbdr-poc2-state")]
-    ENG -->|"identify-lane live fetch"| BR["AgentCore Browser\naws.browser.v1"]
-    ENG <-->|"voice exemplars + account events"| MEM["AgentCore Memory\nbdr_poc2_memory"]
-    ENG -->|"MCP tools/call (SigV4)"| GW["AgentCore Gateway\nbdr-poc2-gateway"]
-    GW -->|"lambda target"| CRM["Lambda\nbdr-poc2-crm-lookup"]
-    ENG -->|"tiered model calls"| BED["Bedrock\nhaiku · sonnet · opus"]
-    ENG -->|"artifacts + manifest + _trace.json"| S3[("S3\nbdr-poc2-artifacts-{acct}")]
-
-    RT -->|"manifest + cost table"| LAM --> SFN -->|"results[]"| OP
+    OP["run_batch.py"] --> SFN["Step Functions Map\n3 at a time · 50% tolerance"]
+    SFN -->|"per account"| LAM["invoke-account λ"]
+    LAM -->|"invoke_agent_runtime"| ENG["AgentCore Runtime\npipeline engine"]
+    ENG <-->|"checkpoints"| DDB[("DynamoDB")]
+    ENG -->|"live fetch"| BR["Browser tool"]
+    ENG <-->|"voice · events"| MEM["Memory"]
+    ENG -->|"MCP · SigV4"| GW["Gateway"] --> CRM["crm-lookup λ"]
+    ENG -->|"model calls"| BED["Bedrock\nhaiku · sonnet · opus"]
+    ENG -->|"artifacts + trace"| S3[("S3")]
+    ENG -.->|"manifest + cost table"| SFN
 ```
 
 ## 2 · The pipeline as executed (`bdr_outreach.yaml`)
 
-The flow the engine walks per account. Solid nodes checkpoint write-once;
-dashed nodes are idempotent persists that re-run on replay.
+The flow the engine walks per account. Every solid stage checkpoints
+write-once; stages marked `*` are `checkpoint: false` — idempotent persists
+that re-run on every replay. Validate runs in parallel with the whole
+identify composite; verify fans over CRM + identified contacts (7 for the
+Meridian mock); generate fans 3 selected contacts × 3 artifact types.
 
 ```mermaid
 flowchart TB
-    START(["account payload"]) --> PAR
-
-    subgraph PAR ["pre-flight — parallel group"]
+    A(["account"]) --> PRE
+    subgraph PRE ["pre-flight · parallel"]
         direction LR
-        V["validate\nagent · haiku\nfield gate in CODE,\nmodel = advisory reasons"]
-        subgraph IDY ["identify — composite"]
+        V["validate\nhaiku"]
+        subgraph ID ["identify · composite"]
             direction TB
-            F["fetch_pages · tool\nchain: attached → browser → fixture"]
-            E["enrich · agent · sonnet\nanchors/roles from pages ONLY"]
-            P["prioritize · policy\nverbatim HRIS engine → 68/B, P1–P3"]
-            PI["persist_identified\ncheckpoint: false"]
-            F --> E --> P --> PI
+            F["fetch_pages"] --> E["enrich\nsonnet"]
+            E --> P["prioritize\nHRIS P1–P3"] --> PI["persist_identified *"]
         end
     end
-
-    PAR --> VER["verify · agent · haiku\nfan-out per contact (CRM + identified = 7)\ncheckpoints verify#contact_id"]
-    VER --> REC["reconcile · policy\nalphabetical select-3 (config-swappable)"]
-    REC --> BARRIER{"barrier\naccount_valid ∧ three_verified"}
-    BARRIER -->|"unsatisfied → halt (identification already persisted)"| HALT(["halt"])
-    BARRIER --> R["research · agent · sonnet"]
-    R --> S["summary · agent · sonnet\nexactly 5 bullets (in code)"]
-    S --> G["generate · agent · opus\nfan-out 3 contacts × 3 artifacts = 9\ncheckpoints gen#contact#artifact\nvoice from Memory by bdr_id"]
-    G --> PERS["persist\ncheckpoint: false\n§11.2 S3 layout + manifest + Memory event"]
-    PERS --> DONE(["ARTIFACTS_QUEUED_REVIEW"])
+    PRE --> VER["verify × 7\nhaiku · per contact"]
+    VER --> REC["reconcile\nselect 3"]
+    REC --> B{"barrier\nvalid ∧ 3 verified"}
+    B -->|"fail → halt"| H(["halt"])
+    B --> R["research\nsonnet"]
+    R --> S["summary\nsonnet · 5 bullets"]
+    S --> G["generate × 9\nopus · contacts × artifacts"]
+    G --> PER["persist *"] --> DONE(["ARTIFACTS_QUEUED_REVIEW"])
 
     style PI stroke-dasharray: 5 4
-    style PERS stroke-dasharray: 5 4
+    style PER stroke-dasharray: 5 4
 ```
 
 ## 3 · One account, cold — who calls whom (sequence)
@@ -128,86 +117,79 @@ sequenceDiagram
 
 ## 4 · Identify lane — fetch fallback + enrichment contract
 
+The browser pass runs the full recipe (team paths + DuckDuckGo discovery,
+role-targeted `"<company> <role>" LinkedIn` searches, a signals query) and is
+best-effort: any failure falls through the chain. Empty pages skip the model
+call entirely — nothing to judge means nothing invented. The prioritizer's
+email policy: direct addresses always attach; pattern guesses only at HIGH
+confidence.
+
 ```mermaid
 flowchart TB
-    A(["fetch_pages starts"]) --> Q1{"account payload\ncarries page_texts?"}
-    Q1 -->|yes| USE1["use attached pages"]
-    Q1 -->|no| Q2{"browser fetch\n(AgentCore session)"}
-    Q2 -->|"pages found"| USE2["use live pages\nPass A: /about /team /leadership + DDG discovery\nPass B: '&lt;company&gt; &lt;role&gt; LinkedIn' per committee role\nPass C: funding/hiring signals"]
-    Q2 -->|"nothing / any failure → fall through"| Q3{"fixture exists\nmocks/pages/{domain}.json?"}
-    Q3 -->|yes| USE3["use fixture pages"]
-    Q3 -->|no| EMPTY["[] — prioritizer degrades + warns"]
-
-    USE1 --> CK[("checkpoint raw pages\nreplay NEVER re-fetches")]
-    USE2 --> CK
-    USE3 --> CK
-    EMPTY --> CK
-
-    CK --> ENR{"pages empty?"}
-    ENR -->|yes| SKIP["Enrichment() — NO model call\n(nothing to judge, nothing invented)"]
-    ENR -->|no| SONNET["sonnet judges: anchor quality,\nroles, linkedin_found, incumbents"]
-    SKIP --> PRI
-    SONNET --> PRI["hris_contact_prioritizer (verbatim):\nextract → score 0–100 → P1–P3\nemail policy: direct always, pattern-guess only HIGH"]
+    A(["fetch_pages"]) --> Q1{"attached\npages?"}
+    Q1 -->|yes| CK[("checkpoint\nraw pages")]
+    Q1 -->|no| Q2{"browser finds\npages?"}
+    Q2 -->|yes| CK
+    Q2 -->|"no / any error"| Q3{"fixture\nexists?"}
+    Q3 -->|yes| CK
+    Q3 -->|"no → [] + warn"| CK
+    CK --> E{"pages\nempty?"}
+    E -->|"yes — no model call"| PRI
+    E -->|no| SON["enrich · sonnet\nanchors · roles · linkedin"]
+    SON --> PRI["prioritize\nscore 0–100 · P1–P3\nemail policy"]
 ```
 
 ## 5 · The checkpoint mechanic — why replay is free
 
+Write-once at `(batch_id, account_id, stage_key)`: the conditional put means
+the first writer wins; a whole-account replay is 0.8s vs ~36–50s cold.
+
 ```mermaid
 flowchart LR
-    RUN["engine runs stage key\n(batch, account, stage_key)"] --> GET{"DynamoDB\nGetItem"}
-    GET -->|"item exists"| CACHED["return stored output\n0 model calls · 0 browser · ~ms"]
-    GET -->|miss| COMPUTE["run strategy\n(model / browser / pure code)"]
-    COMPUTE --> PUT["PutItem\nConditionExpression:\nattribute_not_exists(pk)"]
-    PUT -->|"first writer wins"| OK["output stored forever"]
-    PUT -->|"concurrent loser"| OK
-    OK --> RET["return output"]
-
-    CACHED -.->|"whole account cached:\n0.8s vs ~36s cold"| RET
+    RUN["stage runs"] --> GET{"GetItem"}
+    GET -->|hit| HIT["return stored output\n~ms · $0 · no side effects"]
+    GET -->|miss| C["compute\nmodel / browser / code"]
+    C --> PUT["PutItem\nattribute_not_exists(pk)"]
+    PUT --> RET["return output"]
 ```
 
 ## 6 · Auth & IAM — who signs what
 
-No secrets anywhere: every arrow is an IAM role or SigV4 signature.
+Every hop is an IAM role or a SigV4 signature; the system stores zero
+secrets. The runtime's execution role is toolkit-minted and discovered
+post-deploy; the installer attaches six inline policies to it.
 
 ```mermaid
 flowchart TB
-    subgraph roles ["Execution identities"]
-        SFNR["bdr-poc2-batch-envelope-role\n→ lambda:InvokeFunction"]
-        LAMR["bdr-poc2-invoke-account-role\n→ bedrock-agentcore:InvokeAgentRuntime + logs"]
-        RTR["AmazonBedrockAgentCoreSDKRuntime-…\n(toolkit-minted, discovered post-deploy)\n+ BdrArtifactsS3Write + BdrStateTable + BdrEcrPull\n+ BdrBrowserTool + BdrMemory + BdrGateway"]
-        GWR["bdr-poc2-gateway-role\n→ lambda:InvokeFunction (crm-lookup only)"]
-    end
-
-    SFN["Step Functions"] -->|assumes| SFNR -->|invokes| LAM["invoke-account λ"]
-    LAM -->|assumes| LAMR -->|invokes| RT["AgentCore Runtime"]
-    RT -->|assumes| RTR
-    RTR -->|"Bedrock converse"| BED["models"]
-    RTR -->|"S3 / DynamoDB"| DATA[("state + artifacts")]
-    RTR -->|"browser sessions"| BR["aws.browser.v1"]
-    RTR -->|"events + retrieval"| MEM["Memory"]
-    RTR -->|"SigV4-signed MCP tools/call\n(AWS_IAM authorizer — no Cognito,\nno client secrets)"| GW["Gateway"]
-    GW -->|assumes| GWR -->|invokes| CRM["crm-lookup λ"]
+    SFN["Step Functions"] -->|"role: invoke λ"| LAM["invoke-account λ"]
+    LAM -->|"role: InvokeAgentRuntime"| RT["Runtime\n(execution role)"]
+    RT -->|"inline grants"| PERMS["S3 · DynamoDB · ECR\nBrowser · Memory · Bedrock"]
+    RT -->|"SigV4 MCP call\nAWS_IAM · no secrets"| GW["Gateway"]
+    GW -->|"role: invoke λ"| CRM["crm-lookup λ"]
 ```
 
 ## 7 · Model roster — every agent call in one cold account
 
+20 model calls, ~24k in / ~4.4k out tokens, ≈$0.32 cold and $0 on replay.
+The tier lint keeps Opus inside generation-flagged stages only.
+
 ```mermaid
 flowchart LR
-    subgraph haiku ["haiku · temp 0.0 · $0.017"]
-        H1["validate ×1\n(advisory reasons)"]
-        H2["verify ×7\n(email-or-phone)"]
+    subgraph H ["haiku · $0.017"]
+        H1["validate ×1"]
+        H2["verify ×7"]
     end
-    subgraph sonnet ["sonnet · temp 0.3 · $0.036"]
-        S1["enrich ×1\n(anchor judgment)"]
+    subgraph S ["sonnet · $0.036"]
+        S1["enrich ×1"]
         S2["research ×1"]
-        S3["summary ×1\n(5 bullets)"]
+        S3["summary ×1"]
     end
-    subgraph opus ["opus · temp 0.7 · $0.266 — generation only (tier lint)"]
+    subgraph O ["opus · $0.266"]
         O1["email ×3"]
         O2["linkedin ×3"]
         O3["talk_track ×3"]
     end
-    haiku --> TOTAL["20 model calls\n24.2k in / 4.4k out tokens\n$0.32 / account cold\n$0 on replay"]
-    sonnet --> TOTAL
-    opus --> TOTAL
+    H --> T["$0.32 / account\n$0 on replay"]
+    S --> T
+    O --> T
 ```

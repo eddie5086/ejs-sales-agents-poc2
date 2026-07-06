@@ -36,7 +36,7 @@ MERMAID_THEME = {
     "theme": "neutral",
     "themeVariables": {
         "fontFamily": "ui-monospace, SF Mono, Menlo, monospace",
-        "fontSize": "14px",
+        "fontSize": "16px",
         "primaryColor": "#EFEFEA",
         "primaryBorderColor": "#0E7C74",
         "primaryTextColor": "#1F2428",
@@ -75,9 +75,9 @@ def render_svg(name: str, source: str, workdir: Path) -> str:
         text = text.replace(f'url(#{i})', f'url(#{name}-{i})')
         text = text.replace(f'href="#{i}"', f'href="#{name}-{i}"')
 
-    # Drop fixed dimensions from the root; the page CSS scales via viewBox.
-    text = re.sub(r'(<svg[^>]*?) width="[^"]*"', r"\1", text, count=1)
-    text = re.sub(r'(<svg[^>]*?) height="[^"]*"', r"\1", text, count=1)
+    # Keep the root's natural width/height: diagrams render 1:1 (readable
+    # text) and the panel scrolls horizontally when they're wider than the
+    # page — scaling-to-fit shrank text to illegibility.
     return text
 
 
