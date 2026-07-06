@@ -3,16 +3,17 @@
 
     python scripts/install.py
 
-Phase 0: validates config.json, prints the STS identity it would deploy to,
-preflights Bedrock model access, and reports that no AWS resources exist yet.
-Each later phase appends its deploy step here IN THE SAME PR that introduces
-the resource (MIGRATION.md — the installer is never "caught up").
+Runs, in order: config lint, Bedrock model-access preflight, then the runtime
+(S3 bucket + AgentCore container + role policies), DynamoDB, and Step Functions
+deploys. Each later phase appends its deploy step here IN THE SAME PR that
+introduces the resource (MIGRATION.md — the installer is never "caught up").
 
 Uses whatever AWS credentials your environment is configured with — deploys to
 THAT account.
 """
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -39,6 +40,11 @@ def preflight_models() -> bool:
     return ok
 
 
+def run(script: str) -> None:
+    print(f"\n{'=' * 64}\n  {script}\n{'=' * 64}")
+    subprocess.run([sys.executable, str(ROOT / "scripts" / script)], check=True, cwd=ROOT)
+
+
 def main() -> int:
     print("=== preflight: config.json lint ===")
     problems = C.validate()
@@ -59,10 +65,13 @@ def main() -> int:
               "config.json models, then re-run. Aborting before creating resources.")
         return 1
 
-    # Phase 0 creates no AWS resources. Later phases append their deploy steps:
-    #   Phase 2: deploy_agentcore.py, deploy_dynamodb.py, deploy_stepfunctions.py
-    #   Phase 3+: Browser / Memory / Gateway permissions and stores
-    print("\nDONE — preflight passed. No AWS resources to create yet (Phase 0).")
+    run("deploy_agentcore.py")      # S3 bucket + runtime + role policies
+    run("deploy_dynamodb.py")       # state table
+    run("deploy_stepfunctions.py")  # Lambda proxy + state machine
+    # Phase 3+: Browser / Memory / Gateway permissions and stores land here.
+
+    print("\nDONE — stack installed. Smoke test:\n  python scripts/invoke_agentcore.py\n"
+          "Batch:\n  python scripts/run_batch.py --batch-id batch-fresh-001")
     return 0
 
 
