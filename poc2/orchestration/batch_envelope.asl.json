@@ -1,0 +1,42 @@
+{
+  "Comment": "Weekly-batch envelope (§6). Fans out per Account; each Map iteration invokes the AgentCore runtime (via the invoke-account Lambda proxy) to run that Account's full agentic loop. This is the DEPLOYED state machine; account_flow.asl.json is the per-Account conceptual expansion of what happens inside the runtime.",
+  "StartAt": "FanOutAccounts",
+  "States": {
+    "FanOutAccounts": {
+      "Type": "Map",
+      "ItemsPath": "$.accounts",
+      "MaxConcurrency": 3,
+      "ToleratedFailurePercentage": 50,
+      "ItemSelector": {
+        "account.$": "$$.Map.Item.Value",
+        "batch_id.$": "$.batch_id"
+      },
+      "ItemProcessor": {
+        "ProcessorConfig": { "Mode": "INLINE" },
+        "StartAt": "RunAccount",
+        "States": {
+          "RunAccount": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+              "FunctionName": "${InvokeAccountFunctionArn}",
+              "Payload.$": "$"
+            },
+            "OutputPath": "$.Payload",
+            "Retry": [
+              {
+                "ErrorEquals": ["States.ALL"],
+                "IntervalSeconds": 5,
+                "MaxAttempts": 2,
+                "BackoffRate": 2.0
+              }
+            ],
+            "End": true
+          }
+        }
+      },
+      "ResultPath": "$.results",
+      "End": true
+    }
+  }
+}

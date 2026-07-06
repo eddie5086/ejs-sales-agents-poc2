@@ -36,9 +36,12 @@ def delete_state_machine() -> None:
     sfn = boto3.client("stepfunctions", region_name=C.region())
     arn = f"arn:aws:states:{C.region()}:{C.account_id()}:stateMachine:{C.sfn_name()}"
     try:
-        sfn.describe_state_machine(stateMachineArn=arn)
+        status = sfn.describe_state_machine(stateMachineArn=arn)["status"]
     except ClientError:
         return _gone("state machine", C.sfn_name())
+    if status == "DELETING":  # deletion is async; a re-run just reports it
+        print(f"  --    state machine '{C.sfn_name()}' already deleting")
+        return
     sfn.delete_state_machine(stateMachineArn=arn)
     _deleted("state machine", C.sfn_name())
 
@@ -107,8 +110,15 @@ def delete_agent_runtime() -> None:
     match = [r for r in runtimes if r.get("agentRuntimeName") == C.agent_name()]
     if not match:
         return _gone("agentcore runtime", C.agent_name())
-    client.delete_agent_runtime(agentRuntimeId=match[0]["agentRuntimeId"])
-    _deleted("agentcore runtime", C.agent_name())
+    try:
+        client.delete_agent_runtime(agentRuntimeId=match[0]["agentRuntimeId"])
+        _deleted("agentcore runtime", C.agent_name())
+    except ClientError as e:
+        # deletion is async; a re-run while status=DELETING conflicts — that's done
+        if e.response["Error"]["Code"] == "ConflictException":
+            print(f"  --    agentcore runtime '{C.agent_name()}' already deleting")
+        else:
+            raise
 
 
 def main() -> int:

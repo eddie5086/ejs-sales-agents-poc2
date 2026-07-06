@@ -48,7 +48,7 @@ session reading this) is to implement it, phase by phase.
 |---|---|---|
 | 0 — Scaffold + engine skeleton + migration tooling | ✅ done (2026-07-05) | 2-stage demo pipeline runs locally from config; `python -m deploy.config` prints resolved names — verified: 35 offline tests green, demo runs, resolved set correct on 296497502276, installer preflight passes |
 | 1 — Port the product behind the engine | ✅ done (2026-07-05) | local run vs real Bedrock reproduces poc1 output (Meridian 68/B, Northwind 59/C) from config alone — verified: 65 offline tests green (16 golden locked), real-Bedrock batch run hit every parity target (68/B + high-conf IT-Director email + trinet; 59/C + P3 email withheld at moderate conf + rippling), 10 artifacts/account in the §11.2 layout |
-| 2 — Deploy the envelope (Runtime + DynamoDB + SFN) | ❌ | AWS batch run + sub-second idempotent replay |
+| 2 — Deploy the envelope (Runtime + DynamoDB + SFN) | ✅ done (2026-07-05) | AWS batch run + sub-second idempotent replay — verified: install.py deployed the full stack; 2-account SFN batch cold in 43s wall (23 stages/account, 68/B + 59/C reproduced in AWS); replay of the same batch_id at 0.8s/account, computed=0 cached=23; uninstall.py tore down all 8 resources and re-runs clean; stack reinstalled after |
 | 3 — Live web fetch via AgentCore Browser tool | ❌ | identify lane fetches via Browser for a real company; fixtures still work |
 | 4 — AgentCore Memory (BDR voice + account history) | ❌ | two BDRs get distinguishably different voice from config+memory only |
 | 5 — Gateway (internal MCP tools) + Observability + docs | ❌ | parity matrix vs poc1 all green + new capabilities demonstrated |
@@ -148,13 +148,31 @@ access blocks apply, see `docs/AWS-GOTCHAS.md` §1.
   `prompts/product_context.md`, referenced from generate-stage params
   (`voice: static`; `voice: memory` errors until Phase 4).
 
+## Phase 2 notes
+
+- The runtime entrypoint (`agentcore_app.py`) wraps the ENGINE: payload may
+  carry `pipeline:` (defaults `pipelines/bdr_outreach.yaml`); the response is
+  the persist stage's manifest. Heavy imports stay inside the handler (30s
+  init cap).
+- Deploy family ported wholesale from poc1 (`deploy_agentcore.py`,
+  `deploy_dynamodb.py`, `deploy_stepfunctions.py`), all names via
+  `deploy/config.py`. `scripts/run_batch.py` starts/waits an SFN batch and
+  prints per-account timing (same `batch_id` = replay; fresh = cold).
+- Async deletions (SFN, AgentCore runtime) made `uninstall.py` re-runs
+  conflict — it now treats DELETING/ConflictException as already-done.
+- `.dockerignore` keeps .venv/tests/docs out of the CodeBuild image;
+  mocks/prompts/pipelines DO ship in it (fixtures gotcha, AWS-GOTCHAS §2).
+
 ## Commands
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
 pytest -q                                  # offline tests (pin testpaths=tests in pytest.ini from day one)
-python -m poc2.run pipelines/demo.yaml     # run a pipeline locally
+python -m poc2.run pipelines/demo.yaml     # run a pipeline locally (no AWS)
+python -m poc2.run pipelines/bdr_outreach.yaml --batch mocks/sample_batch.json  # local, real Bedrock
 python -m deploy.config                    # print resolved per-account resources
-python scripts/install.py                  # preflight + deploy everything that exists so far
+python scripts/install.py                  # preflight + deploy the whole stack
+python scripts/invoke_agentcore.py         # smoke-test one account on the deployed runtime
+python scripts/run_batch.py --batch-id b1  # SFN batch (same id = replay, fresh id = cold)
 python scripts/uninstall.py                # scripted teardown
 ```
