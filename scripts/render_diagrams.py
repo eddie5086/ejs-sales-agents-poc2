@@ -31,24 +31,42 @@ OVERVIEW_HTML = ROOT / "docs" / "overview.html"
 # matching data-diagram panel in overview.html.
 NAMES = ["e2e", "pipeline", "sequence", "identify", "checkpoint", "auth", "roster"]
 
-# Matches the overview page's palette (light panel in both themes).
+# Dark navy scheme, matching how GitHub renders the .md diagrams in dark
+# mode: white text, blue arrows and boundaries. The overview page's panels
+# carry the same fixed navy background in BOTH page themes.
+PANEL_BG = "#0D1B2A"
 MERMAID_THEME = {
-    "theme": "neutral",
+    "theme": "base",
     "themeVariables": {
+        "darkMode": True,
         "fontFamily": "ui-monospace, SF Mono, Menlo, monospace",
         "fontSize": "16px",
-        "primaryColor": "#EFEFEA",
-        "primaryBorderColor": "#0E7C74",
-        "primaryTextColor": "#1F2428",
-        "lineColor": "#6B7378",
-        "clusterBkg": "#F7F7F4",
-        "clusterBorder": "#DDDDD6",
-        "actorBorder": "#0E7C74",
-        "actorBkg": "#EFEFEA",
-        "signalColor": "#1F2428",
-        "signalTextColor": "#1F2428",
-        "noteBkgColor": "#FDF6E3",
-        "noteBorderColor": "#C2703D",
+        "background": PANEL_BG,
+        "primaryColor": "#16283C",          # node fill
+        "primaryTextColor": "#E6EDF3",      # node text (white)
+        "primaryBorderColor": "#58A6FF",    # node boundary (blue)
+        "secondaryColor": "#1B2A41",
+        "tertiaryColor": "#0F2133",
+        "lineColor": "#58A6FF",             # arrows (blue)
+        "edgeLabelBackground": PANEL_BG,
+        "clusterBkg": "#0F2133",
+        "clusterBorder": "#2F4C6B",
+        "titleColor": "#E6EDF3",
+        "textColor": "#E6EDF3",
+        "actorBkg": "#16283C",
+        "actorBorder": "#58A6FF",
+        "actorTextColor": "#E6EDF3",
+        "actorLineColor": "#2F4C6B",
+        "signalColor": "#E6EDF3",
+        "signalTextColor": "#E6EDF3",
+        "labelBoxBkgColor": "#16283C",
+        "labelBoxBorderColor": "#58A6FF",
+        "labelTextColor": "#E6EDF3",
+        "loopTextColor": "#E6EDF3",
+        "sequenceNumberColor": "#0D1B2A",
+        "noteBkgColor": "#3A2E14",
+        "noteBorderColor": "#D29922",
+        "noteTextColor": "#E6EDF3",
     },
 }
 
